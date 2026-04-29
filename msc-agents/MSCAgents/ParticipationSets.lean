@@ -1,10 +1,8 @@
 /- 
   MSCAgents/ParticipationSets.lean
   ================================
-  Formalization of Definition `def:participation-sets` from:
+  Formalization of Definition 12 (def:participation-sets) from sec:projection of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
-
-  Paper section: sec:projection (From Global to Distributed Programs / Projection)
 -/
 
 import MSCAgents.Syntax

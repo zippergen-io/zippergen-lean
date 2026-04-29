@@ -3,7 +3,6 @@
   =================================
   Formalization of:
     • Definition 8  (def:inductive-msc)  — Inductive MSC Semantics ⟦P⟧
-    • Remark 2      (rem:sem-complete)   — Completeness of Inductive Semantics
 
   Paper: "Provable Coordination for LLM Agents via Message Sequence Charts"
   Section: sec:semantics
@@ -19,9 +18,6 @@
       = ⋃_{k≥0} { (M_{while_⊤}^B ∘ M₁) ∘ ⋯ ∘ (M_{while_⊤}^B ∘ Mₖ) ∘ (M_{while_⊥}^B ∘ M_exit)
                  | Mᵢ ∈ ⟦P_body⟧, M_exit ∈ ⟦P_exit⟧ }
 
-  Remark (rem:sem-complete):
-    For every program P and every M ∈ ⟦P⟧, the MSC M is complete.
-    Proof: by structural induction on P from the semantic clauses.
 -/
 
 import MSCAgents.Syntax

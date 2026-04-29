@@ -1,7 +1,7 @@
 /- 
   MSCAgents/WellTyped.lean
   =========================
-  Formalization of Definition `def:well-typed` from:
+  Formalization of Definition 5 (def:well-typed) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   Paper section: sec:semantics

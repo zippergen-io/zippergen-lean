@@ -1,7 +1,9 @@
 /- 
   MSCAgents/Correctness.lean
   ==========================
-  Scaffold for the main correctness theorem from sec:projection.
+  Formalization of Theorem (thm:correctness) from sec:projection:
+    • Item 1: realization_complete (L1925) — every M ∈ ⟦P⟧ has a distributed realization
+    • Item 2: realization_sound    (L2384) — every distributed execution erases to ⟦P⟧
 -/
 
 import MSCAgents.BroadcastMSC
