@@ -29,7 +29,7 @@ import MSCAgents.Alphabets
 import MSCAgents.MSCConcat
 import MSCAgents.CanonicalMSC
 import MSCAgents.MSC
-import MSCAgents.WellFormed
+import MSCAgents.WellTyped
 
 ------------------------------------------------------------------------
 -- Semantic domain: sets of word-tuples
@@ -100,20 +100,20 @@ notation "⟦" P "⟧" => mscSemantics P
 end InductiveSemantics
 
 ------------------------------------------------------------------------
--- Basic existence: well-formed programs have some MSC semantics
+-- Basic existence: well-typed programs have some MSC semantics
 ------------------------------------------------------------------------
 
 section SemanticsNonempty
 
 variable {L C F Payload : Type} [DecidableEq L] [PayloadCompatiblePred Payload]
 
-/-- Every well-formed global program denotes at least one MSC in the inductive
+/-- Every well-typed global program denotes at least one MSC in the inductive
     semantics. This is the semantic existence fact used by the zipper/control
     proofs to pick a concrete continuation when no branch decision has yet been
     fixed by the current prefix. -/
 theorem mscSemantics_nonempty
     (prog : Prog L C F Payload)
-    (hProg : WellFormedProgram prog) :
+    (hProg : WellTypedProgram prog) :
     ∃ M : WordTuple L C F Payload, ⟦prog⟧ M := by
   induction prog with
   | eps =>
@@ -189,7 +189,7 @@ theorem concatList_complete
     Proof: by structural induction on P. -/
 theorem mscSemantics_complete
     (prog : Prog L C F Payload)
-    (hProg : WellFormedProgram prog)
+    (hProg : WellTypedProgram prog)
     (M : WordTuple L C F Payload)
     (hM : ⟦prog⟧ M) :
     IsCompleteMSC M := by
@@ -208,7 +208,7 @@ theorem mscSemantics_complete
   | msg A xs B ys h =>
     simp [mscSemantics] at hM
     subst hM
-    exact mscMsg_isCompleteMSC A xs B ys h (by simpa [WellFormedProgram] using hProg)
+    exact mscMsg_isCompleteMSC A xs B ys h (by simpa [WellTypedProgram] using hProg)
 
   -- Base case: act A(ys) := f(xs)
   -- ⟦act⟧ = {mscAct ...}, which is complete.

@@ -95,7 +95,7 @@ infixl:50 " ;; " => Prog.seq
 -- Well-formedness note
 ------------------------------------------------------------------------
 
-section WellFormedness
+section WellTypedness
 
 variable {L C F Payload : Type}
 
@@ -108,7 +108,7 @@ theorem Prog.msg_neq
     (h : sender ≠ receiver) :
     sender ≠ receiver := h
 
-end WellFormedness
+end WellTypedness
 
 ------------------------------------------------------------------------
 -- Example programs (smoke tests documenting the syntax)

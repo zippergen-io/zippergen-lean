@@ -1321,7 +1321,7 @@ theorem distSemantics_project_if_false
     control decision. -/
 theorem distSemantics_while_decompose
     (c : C) (B : L) (PBody PExit : Prog L C F Payload)
-    (hWFBody : WellFormedProgram PBody)
+    (hWFBody : WellTypedProgram PBody)
     (Mhat : WordTuple L C F Payload)
     (hDist :
       distSemantics (L := L) (C := C) (F := F) (Payload := Payload)
@@ -1924,7 +1924,7 @@ theorem distSemantics_while_decompose
     the original MSC. -/
 theorem realization_complete
     (prog : Prog L C F Payload)
-    (hWellFormed : WellFormedProgram prog)
+    (hWellFormed : WellTypedProgram prog)
     (hCtrl : ControlDistinguishableProgram (L := L) (C := C) (F := F) (Payload := Payload) prog) :
     ∀ M, ⟦prog⟧ M →
       ∃ Mhat,
@@ -1945,7 +1945,7 @@ theorem realization_complete
       rcases hCtrl with ⟨hxs, hys⟩
       refine ⟨mscMsg (C := C) (F := F) A xs B ys h,
         distSemantics_project_msg (L := L) (C := C) (F := F) (Payload := Payload)
-          A xs B ys h (by simpa [WellFormedProgram] using hWellFormed), ?_⟩
+          A xs B ys h (by simpa [WellTypedProgram] using hWellFormed), ?_⟩
       simpa [eraseTuple_mscMsg] using
         (eraseTuple_mscMsg (L := L) (C := C) (F := F) (Payload := Payload) A xs B ys h hxs hys)
   | act A ys f xs =>
@@ -2318,13 +2318,13 @@ theorem realization_complete
         ext X
         simp [WordTuple.concat, WordTuple.concat_assoc, mscEmpty, WordTuple.empty]
 
-/-- Existence of a complete distributed realization for every well-formed,
+/-- Existence of a complete distributed realization for every well-typed,
     control-distinguishable global program. This combines semantic nonemptiness
     with the constructive realization theorem and is intended as a reusable
     helper for the zipper/control proofs. -/
 theorem exists_distSemantics
     (prog : Prog L C F Payload)
-    (hWellFormed : WellFormedProgram prog)
+    (hWellFormed : WellTypedProgram prog)
     (hCtrl : ControlDistinguishableProgram (L := L) (C := C) (F := F) (Payload := Payload) prog) :
     ∃ Mhat,
       distSemantics (L := L) (C := C) (F := F) (Payload := Payload)
@@ -2336,7 +2336,7 @@ theorem exists_distSemantics
   exact ⟨Mhat, hDist⟩
 
 /-- **lem:complete-locals-complete-msc**: If every lifeline's local word satisfies
-    the projection semantics of a well-formed program,
+    the projection semantics of a well-typed program,
     AND the resulting word tuple is already an MSC (has no unmatched receives,
     compatible matched payloads, and acyclic causality), then it is a *complete* MSC
     (sends = receives on every channel).
@@ -2347,7 +2347,7 @@ theorem exists_distSemantics
     missing direction (sndCount ≤ rcvCount) follows from the program structure. -/
 theorem complete_locals_isCompleteMSC
     (prog : Prog L C F Payload)
-    (hWellFormed : WellFormedProgram prog)
+    (hWellFormed : WellTypedProgram prog)
     (w : (A : L) → LocalWord (C := C) (F := F) (Payload := Payload) A)
     (hTrace : ∀ A, localTraceSemantics
       (project (L := L) (C := C) (F := F) (Payload := Payload) A prog) (w A))
@@ -2383,7 +2383,7 @@ theorem complete_locals_isCompleteMSC
       body executions and exit execution; apply IHs. -/
 theorem realization_sound
     (prog : Prog L C F Payload)
-    (hWellFormed : WellFormedProgram prog)
+    (hWellFormed : WellTypedProgram prog)
     (hCtrl : ControlDistinguishableProgram (L := L) (C := C) (F := F) (Payload := Payload) prog) :
     ∀ Mhat, distSemantics (L := L) (C := C) (F := F) (Payload := Payload)
       (projectDist (L := L) (C := C) (F := F) (Payload := Payload) prog) Mhat →

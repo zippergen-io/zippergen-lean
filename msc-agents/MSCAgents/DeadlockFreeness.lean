@@ -41,11 +41,11 @@ section DeadlockFreeCorollary
 variable {L C F Payload : Type} [DecidableEq L] [Fintype L]
 variable [PayloadCompatiblePred Payload] [ControlPayloadSpec Payload]
 
-/-- Corollary `cor:deadlock-free`: the projection of every well-formed global
+/-- Corollary `cor:deadlock-free`: the projection of every well-typed global
     program is deadlock-free in the prefix-extension sense. -/
 theorem projectDist_deadlockFree
     (prog : Prog L C F Payload)
-    (hWF : WellFormedProgram prog) :
+    (hWF : WellTypedProgram prog) :
     DeadlockFree (L := L) (C := C) (F := F) (Payload := Payload)
       (projectDist (L := L) (C := C) (F := F) (Payload := Payload) prog) := by
   intro M hPref

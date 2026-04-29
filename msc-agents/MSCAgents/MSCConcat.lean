@@ -22,7 +22,7 @@
       then M₁ ∘ M₂ is complete.
 
   Note on the MSC predicate:
-    The full definition of MSC well-formedness (def:msc) requires
+    The full definition of MSC well-typedness (def:msc) requires
     the FIFO relation and acyclicity infrastructure (def:tuple-fifo, def:msc).
     Here we axiomatize `IsMSCPredicate` capturing the properties needed
     for the remark. The concrete predicate is given in MSC.lean.
@@ -85,7 +85,7 @@ end ConcatAlgebra
 -- where the FIFO relation and acyclicity are constructed.
 ------------------------------------------------------------------------
 
-/-- Abstract predicate capturing MSC well-formedness and completeness.
+/-- Abstract predicate capturing MSC well-typedness and completeness.
 
     The paper's full MSC definition (def:msc) requires:
       1. No unmatched receives (in the FIFO relation ⊲_M)
@@ -97,7 +97,7 @@ end ConcatAlgebra
     be stated and proved in full generality, to be instantiated concretely
     in MSC.lean. -/
 class IsMSCPredicate (L C F Payload : Type) where
-  /-- The MSC well-formedness predicate. -/
+  /-- The MSC well-typedness predicate. -/
   isMSC : WordTuple L C F Payload → Prop
   /-- Completeness: every send event is matched in ⊲_M. -/
   isComplete : WordTuple L C F Payload → Prop

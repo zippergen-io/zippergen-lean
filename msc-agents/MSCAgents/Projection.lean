@@ -9,7 +9,7 @@
 import MSCAgents.ControlPayload
 import MSCAgents.LocalSyntax
 import MSCAgents.ParticipationSets
-import MSCAgents.WellFormed
+import MSCAgents.WellTyped
 
 attribute [local instance] Classical.propDecidable
 

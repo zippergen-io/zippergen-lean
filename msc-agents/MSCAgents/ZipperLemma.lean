@@ -2408,7 +2408,7 @@ private theorem msg_send_only_completion_msc
 /-- The zipper property packaged as an induction target on global programs. -/
 def UniformZipperProperty
     (P : Prog L C F Payload) : Prop :=
-  WellFormedProgram P →
+  WellTypedProgram P →
     ∀ U V : WordTuple L C F Payload,
       (∀ X,
         localPrefixSemantics
@@ -2619,7 +2619,7 @@ theorem uniformZipper_msg
     UniformZipperProperty (L := L) (C := C) (F := F) (Payload := Payload) (.msg A xs B ys hAB) := by
   intro hWF U V hPref hSide hMSC
   have hCompat : PayloadCompatible Payload xs ys := by
-    simpa [WellFormedProgram] using hWF
+    simpa [WellTypedProgram] using hWF
   have hAPref :
       localPrefixSemantics (L := L) (C := C) (F := F) (Payload := Payload)
         (project (L := L) (C := C) (F := F) (Payload := Payload) A (.msg A xs B ys hAB))
@@ -2795,7 +2795,7 @@ theorem uniformZipper_msg
 private theorem uniformZipper_if_nil_case
     (c : C) (B : L) (PTrue PFalse : Prog L C F Payload)
     (hFalse : UniformZipperProperty (L := L) (C := C) (F := F) (Payload := Payload) PFalse)
-    (hWFFalse : WellFormedProgram PFalse)
+    (hWFFalse : WellTypedProgram PFalse)
     (U V : WordTuple L C F Payload)
     (hPref : ∀ X,
       localPrefixSemantics
@@ -4831,7 +4831,7 @@ theorem uniformZipper_while
   -- We prove this by strong induction on (U B).length, generalizing over U and V.
   -- The induction is set up via a sufficient lemma.
   suffices h : ∀ (n : Nat) (U V : WordTuple L C F Payload),
-      WellFormedProgram (.whileLoop c B PBody PExit) →
+      WellTypedProgram (.whileLoop c B PBody PExit) →
       (U B).length ≤ n →
       (∀ X, localPrefixSemantics (L := L) (C := C) (F := F) (Payload := Payload)
           (project (L := L) (C := C) (F := F) (Payload := Payload) X (.whileLoop c B PBody PExit))
