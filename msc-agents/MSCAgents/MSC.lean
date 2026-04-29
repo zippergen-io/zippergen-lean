@@ -4,7 +4,7 @@
   Formalization of Definition 5 (def:msc) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
-  Paper section: §2.2
+  Paper section: sec:semantics
 
   From the paper (def:msc):
     An MSC is a tuple of local words M = (w_A)_{A ∈ 𝓛} such that:

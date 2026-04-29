@@ -6,7 +6,7 @@
     • Remark 1      (rem:concat-msc)  — Concatenation with a Complete Prefix
 
   Paper: "Provable Coordination for LLM Agents via Message Sequence Charts"
-  Section: §2.2
+  Section: sec:semantics
 
   From the paper:
 

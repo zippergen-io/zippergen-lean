@@ -1,7 +1,7 @@
 /-
   MSCAgents/ZipperPost.lean
   =========================
-  Formalization of Definition `def:zip-post` from Section 3 of:
+  Formalization of Definition `def:zip-post` from sec:projection of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

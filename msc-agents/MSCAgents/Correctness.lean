@@ -1,7 +1,7 @@
 /- 
   MSCAgents/Correctness.lean
   ==========================
-  Scaffold for the main correctness theorem from §3.
+  Scaffold for the main correctness theorem from sec:projection.
 -/
 
 import MSCAgents.BroadcastMSC

@@ -1,7 +1,7 @@
 /- 
   MSCAgents/Projection.lean
   =========================
-  Formalization of the projection definitions from §3
+  Formalization of the projection definitions from sec:projection
   ("From Global to Distributed Programs") of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/

@@ -4,7 +4,7 @@
   Formalization of Definition `def:participation-sets` from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
-  Paper section: §3 (From Global to Distributed Programs / Projection)
+  Paper section: sec:projection (From Global to Distributed Programs / Projection)
 -/
 
 import MSCAgents.Syntax

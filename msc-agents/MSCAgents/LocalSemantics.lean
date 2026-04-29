@@ -2,7 +2,7 @@
   MSCAgents/LocalSemantics.lean
   =============================
   Formalization of the local trace semantics, prefix semantics, and
-  distributed semantics from §3 of:
+  distributed semantics from sec:distributed of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

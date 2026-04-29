@@ -6,7 +6,7 @@
     • Remark 2      (rem:sem-complete)   — Completeness of Inductive Semantics
 
   Paper: "Provable Coordination for LLM Agents via Message Sequence Charts"
-  Section: §2.2
+  Section: sec:semantics
 
   From the paper (def:inductive-msc):
     ⟦ε⟧                           = {M_ε}

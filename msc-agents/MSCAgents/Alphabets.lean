@@ -6,7 +6,7 @@
 
   This file defines the local-word alphabets Σ_A for each lifeline A.
 
-  Paper section: §2.2 (Semantics / Inductive MSC Model)
+  Paper section: sec:semantics (Semantics / Inductive MSC Model)
 
   From the paper (def:alphabets):
     For each lifeline A ∈ 𝓛, the local-word alphabet Σ_A contains:

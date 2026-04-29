@@ -1,7 +1,7 @@
 /-
   MSCAgents/DeadlockFreeness.lean
   ===============================
-  Formalization of Definition `def:deadlock-prefix` from Section 3 of:
+  Formalization of Definition `def:deadlock-prefix` from sec:distributed of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

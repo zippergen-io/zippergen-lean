@@ -6,7 +6,7 @@
 
   This file defines the abstract syntax of global agent programs (Prog).
 
-  Paper section: §2 (Global Agent Programs / Syntax)
+  Paper section: sec:syntax (Global Agent Programs / Syntax)
 
   Grammar from the paper:
     P ::= ε

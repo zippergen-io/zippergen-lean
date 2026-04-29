@@ -1,7 +1,7 @@
 /- 
   MSCAgents/ZipperLemma.lean
   ==========================
-  Structural proof infrastructure for the Uniform Zipper lemma from §3.
+  Structural proof infrastructure for the Uniform Zipper lemma from sec:projection.
 -/
 
 import MSCAgents.ZipperPost

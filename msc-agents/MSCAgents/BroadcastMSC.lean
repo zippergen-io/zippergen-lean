@@ -1,7 +1,7 @@
 /- 
   MSCAgents/BroadcastMSC.lean
   ===========================
-  Helper MSCs for the projection-generated control broadcasts from §3.
+  Helper MSCs for the projection-generated control broadcasts from sec:projection.
 -/
 
 import MSCAgents.Projection

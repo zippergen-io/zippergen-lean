@@ -1,7 +1,7 @@
 /- 
   MSCAgents/ControlPayload.lean
   =============================
-  Support for the projection-generated control payloads used in §3 of:
+  Support for the projection-generated control payloads used in sec:projection of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

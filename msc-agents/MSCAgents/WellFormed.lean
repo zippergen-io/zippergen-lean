@@ -4,7 +4,7 @@
   Formalization of Definition `def:well-formed` from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
-  Paper section: §2.2
+  Paper section: sec:semantics
 
   A global program is well formed if every message subterm
   `msg A(x⃗) → B(y⃗)` satisfies `match(x⃗, y⃗)`.

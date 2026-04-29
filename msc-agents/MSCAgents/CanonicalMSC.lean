@@ -7,7 +7,7 @@
   This file defines the canonical (atomic) MSCs from which the
   inductive semantics is built.
 
-  Paper section: §2.2
+  Paper section: sec:semantics
 
   From the paper (def:base-msc):
     Fix A, B ∈ 𝓛, tuples x⃗, y⃗, action f, and choice letter γ ∈ Σ_B.

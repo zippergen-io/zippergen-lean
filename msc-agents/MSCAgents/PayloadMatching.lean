@@ -4,7 +4,7 @@
   Formalization of Definition 4 (def:payload-matching) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
-  Paper section: §2.2
+  Paper section: sec:semantics
 
   From the paper (def:payload-matching):
     Let x⃗ be a concrete sender payload tuple and let y⃗ be a receiver

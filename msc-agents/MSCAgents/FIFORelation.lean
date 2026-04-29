@@ -4,7 +4,7 @@
   Formalization of Definition 3 (def:tuple-fifo) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
-  Paper section: §2.2
+  Paper section: sec:semantics
 
   From the paper (def:tuple-fifo):
     Fix a tuple of local words M = (w_A)_{A ∈ 𝓛} with w_A ∈ (Σ_A)* for each A.

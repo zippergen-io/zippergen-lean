@@ -1,7 +1,7 @@
 /- 
   MSCAgents/LocalSyntax.lean
   ==========================
-  Formalization of the local and distributed syntax from §3
+  Formalization of the local and distributed syntax from sec:distributed
   ("Distributed Agent Programs") of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
