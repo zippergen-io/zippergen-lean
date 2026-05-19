@@ -5,12 +5,20 @@ This file gives the semantic interface used by the first monitor proof.
 The representation is intentionally abstract: the type `Event` is the
 type of events of the MSC, so quantification over `Event` is
 quantification over events in the execution.  An MSC supplies lifelines,
-causal order, event valuations, and the two navigation operations used by
-CPL, namely latest visible event and previous local event, together with
-their specifications.
+event kinds, message matching, causal order, event valuations, and the
+two navigation operations used by CPL, namely latest visible event and
+previous local event, together with their specifications.
 -/
 
 namespace CPLMonitor
+
+/-- Event kinds.  A send event carries its intended receiver. -/
+inductive EventKind (L : Type) where
+  | act : EventKind L
+  | recv : EventKind L
+  | choice : EventKind L
+  | send : L → EventKind L
+deriving Repr
 
 /-- An MSC with event valuations.
 
@@ -27,8 +35,23 @@ structure MSC (L Event Var Val : Type) where
   localIndex_pos : ∀ e, 0 < localIndex e
   localIndex_inj :
     ∀ {e f}, lifeline e = lifeline f → localIndex e = localIndex f → e = f
+  kind : Event → EventKind L
   val : Event → Var → Val
   causal : Event → Event → Prop
+  msg : Event → Event → Prop
+  msg_kind :
+    ∀ {s r}, msg s r →
+      kind s = EventKind.send (lifeline r) ∧
+      kind r = EventKind.recv ∧
+      lifeline s ≠ lifeline r
+  msg_causal :
+    ∀ {s r}, msg s r → causal s r
+  msg_send_unique :
+    ∀ {s r₁ r₂}, msg s r₁ → msg s r₂ → r₁ = r₂
+  msg_recv_unique :
+    ∀ {s₁ s₂ r}, msg s₁ r → msg s₂ r → s₁ = s₂
+  recv_matched :
+    ∀ {r}, kind r = EventKind.recv → ∃ s, msg s r
 
   causal_refl : ∀ e, causal e e
   causal_trans : ∀ {e f g}, causal e f → causal f g → causal e g
