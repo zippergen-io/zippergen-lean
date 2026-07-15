@@ -14,6 +14,14 @@ section Correctness
 variable {L C F Payload : Type} [DecidableEq L] [Fintype L]
 variable [PayloadCompatiblePred Payload] [ControlPayloadSpec Payload]
 
+private abbrev ifControlTag (c : C) (B : L)
+    (PTrue PFalse : Prog L C F Payload) : Payload :=
+  controlTag (Prog.ite c B PTrue PFalse)
+
+private abbrev whileControlTag (c : C) (B : L)
+    (PBody PExit : Prog L C F Payload) : Payload :=
+  controlTag (Prog.whileLoop c B PBody PExit)
+
 -- `distSemantics_if_decompose` and `distSemantics_while_decompose` are proved
 -- below, after the local helper layer.
 
@@ -97,7 +105,7 @@ private theorem localTraceSemantics_sendList_eq {A : L}
         w = sendWordForTargets (L := L) (C := C) (F := F) (Payload := Payload)
           (A := A) payload targets hTargets
   | [], _hTargets, w, h => by
-      simpa [seqLocList, localTraceSemantics] using h
+      simpa [seqLocList, localTraceSemantics, sendWordForTargets] using h
   | X :: Xs, hTargets, w, h => by
       simp [seqLocList] at h
       rcases h with ⟨u1, u2, hu1, hu2, rfl⟩
@@ -114,21 +122,23 @@ private theorem localTraceSemantics_sendList_eq {A : L}
       simp [sendWordForTargets]
 
 private theorem controlBroadcast_trace_eq
-    (A : L) (recips : L → Prop) (decision : Bool)
+    (A : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (w : LocalWord (C := C) (F := F) (Payload := Payload) A)
     (h :
       localTraceSemantics
         (L := L) (C := C) (F := F) (Payload := Payload) (A := A)
-        (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) A recips decision)
+        (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+          A recips decision tag)
         w) :
     w =
-      controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload) A recips decision := by
+      controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
+        A recips decision tag := by
   classical
   have h' :=
     localTraceSemantics_sendList_eq
       (L := L) (C := C) (F := F) (Payload := Payload)
       (A := A)
-      (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+      (taggedControlPayload decision tag)
       (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) A recips)
       (by
         intro X hX
@@ -190,12 +200,13 @@ private theorem sendPayloads_sendWordForTargets_eq {A : L}
                 simp [List.mem_cons]
 
 private theorem sendPayloads_controlBroadcastWord_recipient
-    (A X : L) (recips : L → Prop) (decision : Bool)
+    (A X : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ Y, recips Y → Y ≠ A)
     (hX : recips X) :
     sendPayloads (C := C) (F := F) (Payload := Payload) X
-      (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload) A recips decision) =
-      [ControlPayload.setDecision decision ControlPayload.ctrlPattern] := by
+      (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
+        A recips decision tag) =
+      [ControlPayload.setDecision decision tag] := by
   classical
   unfold controlBroadcastWord
   have hTargets :
@@ -213,25 +224,25 @@ private theorem sendPayloads_controlBroadcastWord_recipient
   rw [sendPayloads_sendWordForTargets_eq
     (L := L) (C := C) (F := F) (Payload := Payload)
     (A := A)
-    (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+    (taggedControlPayload decision tag)
     (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) A recips)
     hTargets
     (List.Nodup.sublist List.filter_sublist
       (controlRecipients_nodup (L := L) (C := C) (F := F) (Payload := Payload) recips))
     X]
-  simp [hXTarget]
+  simp [hXTarget, taggedControlPayload]
 
 private theorem if_recipient_recvPayloads_head
-    (B X : L) (decision : Bool)
+    (B X : L) (decision : Bool) (tag : Payload)
     (M : WordTuple L C F Payload)
     (uX : LocalWord (C := C) (F := F) (Payload := Payload) X)
     (hX :
       M X =
         AlphabetOf.mkRecv (C := C) (F := F) X
-          (ControlPayload.setDecision decision ControlPayload.ctrlPattern) B :: uX) :
+          (ControlPayload.setDecision decision tag) B :: uX) :
     ∃ rs,
       recvPayloads (C := C) (F := F) (Payload := Payload) B (M X) =
-        ControlPayload.setDecision decision ControlPayload.ctrlPattern :: rs := by
+        ControlPayload.setDecision decision tag :: rs := by
   refine ⟨recvPayloads (C := C) (F := F) (Payload := Payload) B uX, ?_⟩
   rw [hX]
   simp [recvPayloads, AlphabetOf.mkRecv, Letter.isRecvFrom]
@@ -249,17 +260,19 @@ private theorem if_true_recipient_false_impossible
           (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
             B
             (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-            true ++ uB))
+            true (ifControlTag (Payload := Payload) c B PTrue PFalse) ++ uB))
     (hMX :
       Mhat X =
         AlphabetOf.mkRecv (C := C) (F := F) X
-          (ControlPayload.setDecision false ControlPayload.ctrlPattern) B :: uX)
+          (ControlPayload.setDecision false
+            (ifControlTag (Payload := Payload) c B PTrue PFalse)) B :: uX)
     (hMSC : IsMSC (L := L) (C := C) (F := F) (Payload := Payload) Mhat) :
     False := by
   have hs :
       ∃ ss,
         sendPayloads (C := C) (F := F) (Payload := Payload) X (Mhat B) =
-          ControlPayload.setDecision true ControlPayload.ctrlPattern :: ss := by
+          ControlPayload.setDecision true
+            (ifControlTag (Payload := Payload) c B PTrue PFalse) :: ss := by
     refine ⟨sendPayloads (C := C) (F := F) (Payload := Payload) X uB, ?_⟩
     rw [hMB]
     simp [sendPayloads, AlphabetOf.mkIfTrue, Letter.isSendTo,
@@ -267,15 +280,19 @@ private theorem if_true_recipient_false_impossible
         (L := L) (C := C) (F := F) (Payload := Payload)
         B X
         (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-        true (by intro Y hY; exact hY.1) hRecip]
+        true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+        (by intro Y hY; exact hY.1) hRecip, taggedControlPayload]
   have hr :=
     if_recipient_recvPayloads_head
       (L := L) (C := C) (F := F) (Payload := Payload)
-      B X false Mhat uX hMX
+      B X false (ifControlTag (Payload := Payload) c B PTrue PFalse) Mhat uX hMX
   have hEq :=
-    firstControlDecisions_eq
+    firstTaggedControlDecisions_eq
       (L := L) (C := C) (F := F) (Payload := Payload)
-      Mhat hMSC B X true false hs hr
+      Mhat hMSC B X true false
+      (ifControlTag (Payload := Payload) c B PTrue PFalse)
+      (ifControlTag (Payload := Payload) c B PTrue PFalse)
+      hs hr
   cases hEq
 
 private theorem if_false_recipient_true_impossible
@@ -291,17 +308,19 @@ private theorem if_false_recipient_true_impossible
           (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
             B
             (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-            false ++ uB))
+            false (ifControlTag (Payload := Payload) c B PTrue PFalse) ++ uB))
     (hMX :
       Mhat X =
         AlphabetOf.mkRecv (C := C) (F := F) X
-          (ControlPayload.setDecision true ControlPayload.ctrlPattern) B :: uX)
+          (ControlPayload.setDecision true
+            (ifControlTag (Payload := Payload) c B PTrue PFalse)) B :: uX)
     (hMSC : IsMSC (L := L) (C := C) (F := F) (Payload := Payload) Mhat) :
     False := by
   have hs :
       ∃ ss,
         sendPayloads (C := C) (F := F) (Payload := Payload) X (Mhat B) =
-          ControlPayload.setDecision false ControlPayload.ctrlPattern :: ss := by
+          ControlPayload.setDecision false
+            (ifControlTag (Payload := Payload) c B PTrue PFalse) :: ss := by
     refine ⟨sendPayloads (C := C) (F := F) (Payload := Payload) X uB, ?_⟩
     rw [hMB]
     simp [sendPayloads, AlphabetOf.mkIfFalse, Letter.isSendTo,
@@ -309,15 +328,19 @@ private theorem if_false_recipient_true_impossible
         (L := L) (C := C) (F := F) (Payload := Payload)
         B X
         (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-        false (by intro Y hY; exact hY.1) hRecip]
+        false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+        (by intro Y hY; exact hY.1) hRecip, taggedControlPayload]
   have hr :=
     if_recipient_recvPayloads_head
       (L := L) (C := C) (F := F) (Payload := Payload)
-      B X true Mhat uX hMX
+      B X true (ifControlTag (Payload := Payload) c B PTrue PFalse) Mhat uX hMX
   have hEq :=
-    firstControlDecisions_eq
+    firstTaggedControlDecisions_eq
       (L := L) (C := C) (F := F) (Payload := Payload)
-      Mhat hMSC B X false true hs hr
+      Mhat hMSC B X false true
+      (ifControlTag (Payload := Payload) c B PTrue PFalse)
+      (ifControlTag (Payload := Payload) c B PTrue PFalse)
+      hs hr
   cases hEq
 
 private theorem while_true_recipient_false_impossible
@@ -333,17 +356,19 @@ private theorem while_true_recipient_false_impossible
           (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
             B
             (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-            true ++ uB))
+            true (whileControlTag (Payload := Payload) c B PBody PExit) ++ uB))
     (hMX :
       Mhat X =
         AlphabetOf.mkRecv (C := C) (F := F) X
-          (ControlPayload.setDecision false ControlPayload.ctrlPattern) B :: uX)
+          (ControlPayload.setDecision false
+            (whileControlTag (Payload := Payload) c B PBody PExit)) B :: uX)
     (hMSC : IsMSC (L := L) (C := C) (F := F) (Payload := Payload) Mhat) :
     False := by
   have hs :
       ∃ ss,
         sendPayloads (C := C) (F := F) (Payload := Payload) X (Mhat B) =
-          ControlPayload.setDecision true ControlPayload.ctrlPattern :: ss := by
+          ControlPayload.setDecision true
+            (whileControlTag (Payload := Payload) c B PBody PExit) :: ss := by
     refine ⟨sendPayloads (C := C) (F := F) (Payload := Payload) X uB, ?_⟩
     rw [hMB]
     simp [sendPayloads, AlphabetOf.mkWhileTrue, Letter.isSendTo,
@@ -351,15 +376,19 @@ private theorem while_true_recipient_false_impossible
         (L := L) (C := C) (F := F) (Payload := Payload)
         B X
         (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-        true (by intro Y hY; exact hY.1) hRecip]
+        true (whileControlTag (Payload := Payload) c B PBody PExit)
+        (by intro Y hY; exact hY.1) hRecip, taggedControlPayload]
   have hr :=
     if_recipient_recvPayloads_head
       (L := L) (C := C) (F := F) (Payload := Payload)
-      B X false Mhat uX hMX
+      B X false (whileControlTag (Payload := Payload) c B PBody PExit) Mhat uX hMX
   have hEq :=
-    firstControlDecisions_eq
+    firstTaggedControlDecisions_eq
       (L := L) (C := C) (F := F) (Payload := Payload)
-      Mhat hMSC B X true false hs hr
+      Mhat hMSC B X true false
+      (whileControlTag (Payload := Payload) c B PBody PExit)
+      (whileControlTag (Payload := Payload) c B PBody PExit)
+      hs hr
   cases hEq
 
 private theorem while_false_recipient_true_impossible
@@ -375,17 +404,19 @@ private theorem while_false_recipient_true_impossible
           (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
             B
             (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-            false ++ uB))
+            false (whileControlTag (Payload := Payload) c B PBody PExit) ++ uB))
     (hMX :
       Mhat X =
         AlphabetOf.mkRecv (C := C) (F := F) X
-          (ControlPayload.setDecision true ControlPayload.ctrlPattern) B :: uX)
+          (ControlPayload.setDecision true
+            (whileControlTag (Payload := Payload) c B PBody PExit)) B :: uX)
     (hMSC : IsMSC (L := L) (C := C) (F := F) (Payload := Payload) Mhat) :
     False := by
   have hs :
       ∃ ss,
         sendPayloads (C := C) (F := F) (Payload := Payload) X (Mhat B) =
-          ControlPayload.setDecision false ControlPayload.ctrlPattern :: ss := by
+          ControlPayload.setDecision false
+            (whileControlTag (Payload := Payload) c B PBody PExit) :: ss := by
     refine ⟨sendPayloads (C := C) (F := F) (Payload := Payload) X uB, ?_⟩
     rw [hMB]
     simp [sendPayloads, AlphabetOf.mkWhileFalse, Letter.isSendTo,
@@ -393,15 +424,19 @@ private theorem while_false_recipient_true_impossible
         (L := L) (C := C) (F := F) (Payload := Payload)
         B X
         (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-        false (by intro Y hY; exact hY.1) hRecip]
+        false (whileControlTag (Payload := Payload) c B PBody PExit)
+        (by intro Y hY; exact hY.1) hRecip, taggedControlPayload]
   have hr :=
     if_recipient_recvPayloads_head
       (L := L) (C := C) (F := F) (Payload := Payload)
-      B X true Mhat uX hMX
+      B X true (whileControlTag (Payload := Payload) c B PBody PExit) Mhat uX hMX
   have hEq :=
-    firstControlDecisions_eq
+    firstTaggedControlDecisions_eq
       (L := L) (C := C) (F := F) (Payload := Payload)
-      Mhat hMSC B X false true hs hr
+      Mhat hMSC B X false true
+      (whileControlTag (Payload := Payload) c B PBody PExit)
+      (whileControlTag (Payload := Payload) c B PBody PExit)
+      hs hr
   cases hEq
 
 theorem distSemantics_if_decompose
@@ -421,6 +456,7 @@ theorem distSemantics_if_decompose
                 B
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                 true
+                (ifControlTag (Payload := Payload) c B PTrue PFalse)
                 (by
                   intro X hX
                   exact hX.1)
@@ -434,6 +470,7 @@ theorem distSemantics_if_decompose
                   B
                   (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                   false
+                  (ifControlTag (Payload := Payload) c B PTrue PFalse)
                   (by
                     intro X hX
                     exact hX.1)
@@ -447,6 +484,7 @@ theorem distSemantics_if_decompose
                 B
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                 false
+                (ifControlTag (Payload := Payload) c B PTrue PFalse)
                 (by
                   intro X hX
                   exact hX.1)
@@ -460,6 +498,7 @@ theorem distSemantics_if_decompose
                   B
                   (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                   true
+                  (ifControlTag (Payload := Payload) c B PTrue PFalse)
                   (by
                     intro X hX
                     exact hX.1)
@@ -475,18 +514,22 @@ theorem distSemantics_if_decompose
       projectDist (L := L) (C := C) (F := F) (Payload := Payload)
         (.ite c B PTrue PFalse) B =
         LocProg.localIf c
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips true)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PTrue)
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips false)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PFalse) := by
     simp [projectDist, project, recips]
   have hBTrace :
       localTraceSemantics
         (L := L) (C := C) (F := F) (Payload := Payload)
         (LocProg.localIf c
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips true)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PTrue)
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips false)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PFalse))
         (Mhat B) := by
     rw [← hBProj]
@@ -497,15 +540,15 @@ theorem distSemantics_if_decompose
     have hSWord :
         sB =
           controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-            B recips true :=
+            B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse) :=
       controlBroadcast_trace_eq
         (L := L) (C := C) (F := F) (Payload := Payload)
-        B recips true sB hsB
+        B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse) sB hsB
     have hMB' :
         Mhat B =
           AlphabetOf.mkIfTrue (C := C) (F := F) (Payload := Payload) B c ::
             (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-              B recips true ++ rB) := by
+              B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse) ++ rB) := by
       simpa [huB, hSWord, List.cons_append, List.append_assoc] using hMB
     have hRecipTrue :
         ∀ X, X ≠ B → recips X →
@@ -515,19 +558,20 @@ theorem distSemantics_if_decompose
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue) uX ∧
             Mhat X =
               AlphabetOf.mkRecv (C := C) (F := F) X
-                (ControlPayload.setDecision true ControlPayload.ctrlPattern) B :: uX := by
+                (ControlPayload.setDecision true
+                  (ifControlTag (Payload := Payload) c B PTrue PFalse)) B :: uX := by
       intro X hXB hRecip
       have hXProj :
           projectDist (L := L) (C := C) (F := F) (Payload := Payload)
             (.ite c B PTrue PFalse) X =
-            LocProg.recvIf ControlPayload.ctrlPattern B
+            LocProg.recvIf (ifControlTag (Payload := Payload) c B PTrue PFalse) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse) := by
         simp [projectDist, project, recips, hXB, hRecip]
       have hXTrace :
           localTraceSemantics
             (L := L) (C := C) (F := F) (Payload := Payload)
-            (LocProg.recvIf ControlPayload.ctrlPattern B
+            (LocProg.recvIf (ifControlTag (Payload := Payload) c B PTrue PFalse) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse))
             (Mhat X) := by
@@ -562,7 +606,7 @@ theorem distSemantics_if_decompose
         dsimp [MTrue]
         simp [projectDist, hrB]
       · by_cases hRecip : recips X
-        · simpa [MTrue, hXB, hRecip] using
+        · simpa [MTrue, hXB, hRecip, projectDist] using
             (Classical.choose_spec (hRecipTrue X hXB hRecip)).1
         · have hNotPartTrue : ¬ participationSet PTrue X := by
             intro hPart
@@ -575,7 +619,8 @@ theorem distSemantics_if_decompose
         Mhat =
           mscIfTrue (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips true (by intro X hX; exact hX.1)
+                  B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                  (by intro X hX; exact hX.1)
             ∘ₘ MTrue := by
       funext X
       by_cases hXB : X = B
@@ -594,13 +639,16 @@ theorem distSemantics_if_decompose
               B X (choiceIfTrue (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips true (by intro Y hY; exact hY.1)) X =
+                B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro Y hY; exact hY.1)) X =
                 [AlphabetOf.mkRecv (C := C) (F := F) X
-                  (ControlPayload.setDecision true ControlPayload.ctrlPattern) B] := by
-            simpa [controlDecisionPayload] using
+                  (ControlPayload.setDecision true
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)) B] := by
+            simpa [controlDecisionPayload, taggedControlPayload] using
               (controlBroadcastMSC_recipient
                 (C := C) (F := F) (Payload := Payload)
-                B X recips true (by intro Y hY; exact hY.1) hRecip)
+                B X recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro Y hY; exact hY.1) hRecip)
           simpa [WordTuple.concat, hChoice, hCtrl, hMTrueX] using hXEq
         · have hChoice :
               mscIfTrue (C := C) (F := F) (Payload := Payload) c B X = [] :=
@@ -608,10 +656,12 @@ theorem distSemantics_if_decompose
               B X (choiceIfTrue (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips true (by intro Y hY; exact hY.1)) X = [] :=
+                B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro Y hY; exact hY.1)) X = [] :=
             controlBroadcastMSC_nonRecipient
               (C := C) (F := F) (Payload := Payload)
-              B X recips true (by intro Y hY; exact hY.1) hXB hRecip
+              B X recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+              (by intro Y hY; exact hY.1) hXB hRecip
           have hXProj :
               projectDist (L := L) (C := C) (F := F) (Payload := Payload)
                 (.ite c B PTrue PFalse) X = LocProg.eps := by
@@ -628,17 +678,20 @@ theorem distSemantics_if_decompose
           (L := L) (C := C) (F := F) (Payload := Payload)
           (mscIfTrue (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips true (by intro X hX; exact hX.1)) := by
+                  B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                  (by intro X hX; exact hX.1)) := by
       exact concat_complete_complete _ _
         (mscIfTrue_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
         (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
-          B recips true (by intro X hX; exact hX.1))
+          B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+          (by intro X hX; exact hX.1))
     have hAll :
         IsCompleteMSC
           (L := L) (C := C) (F := F) (Payload := Payload)
           (mscIfTrue (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips true (by intro X hX; exact hX.1)
+                  B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                  (by intro X hX; exact hX.1)
             ∘ₘ MTrue) := by
       simpa [hEqTrue] using hComplete
     have hCompleteTrue :
@@ -647,7 +700,8 @@ theorem distSemantics_if_decompose
         (L := L) (C := C) (F := F) (Payload := Payload)
         (mscIfTrue (C := C) (F := F) (Payload := Payload) c B
           ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips true (by intro X hX; exact hX.1))
+                B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro X hX; exact hX.1))
         MTrue hPrefixComplete hAll
     have hNoFalse :
         ¬ (∃ MFalse,
@@ -656,14 +710,15 @@ theorem distSemantics_if_decompose
           Mhat =
             mscIfFalse (C := C) (F := F) (Payload := Payload) c B
               ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                    B recips false (by intro X hX; exact hX.1)
+                    B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                    (by intro X hX; exact hX.1)
               ∘ₘ MFalse) := by
       rintro ⟨MFalse, _hDistFalse, hEqFalse'⟩
       have hBFalse :
           Mhat B =
             AlphabetOf.mkIfFalse (C := C) (F := F) (Payload := Payload) B c ::
               (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-                B recips false ++ MFalse B) := by
+                B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse) ++ MFalse B) := by
         have hB := congrFun hEqFalse' B
         simpa [WordTuple.concat, mscIfFalse, choiceIfFalse, controlBroadcastMSC_decider,
           List.append_assoc] using hB
@@ -679,15 +734,15 @@ theorem distSemantics_if_decompose
     have hSWord :
         sB =
           controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-            B recips false :=
+            B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse) :=
       controlBroadcast_trace_eq
         (L := L) (C := C) (F := F) (Payload := Payload)
-        B recips false sB hsB
+        B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse) sB hsB
     have hMB' :
         Mhat B =
           AlphabetOf.mkIfFalse (C := C) (F := F) (Payload := Payload) B c ::
             (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-              B recips false ++ rB) := by
+              B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse) ++ rB) := by
       simpa [huB, hSWord, List.cons_append, List.append_assoc] using hMB
     have hRecipFalse :
         ∀ X, X ≠ B → recips X →
@@ -697,19 +752,20 @@ theorem distSemantics_if_decompose
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse) uX ∧
             Mhat X =
               AlphabetOf.mkRecv (C := C) (F := F) X
-                (ControlPayload.setDecision false ControlPayload.ctrlPattern) B :: uX := by
+                (ControlPayload.setDecision false
+                  (ifControlTag (Payload := Payload) c B PTrue PFalse)) B :: uX := by
       intro X hXB hRecip
       have hXProj :
           projectDist (L := L) (C := C) (F := F) (Payload := Payload)
             (.ite c B PTrue PFalse) X =
-            LocProg.recvIf ControlPayload.ctrlPattern B
+            LocProg.recvIf (ifControlTag (Payload := Payload) c B PTrue PFalse) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse) := by
         simp [projectDist, project, recips, hXB, hRecip]
       have hXTrace :
           localTraceSemantics
             (L := L) (C := C) (F := F) (Payload := Payload)
-            (LocProg.recvIf ControlPayload.ctrlPattern B
+            (LocProg.recvIf (ifControlTag (Payload := Payload) c B PTrue PFalse) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse))
             (Mhat X) := by
@@ -744,7 +800,7 @@ theorem distSemantics_if_decompose
         dsimp [MFalse]
         simp [projectDist, hrB]
       · by_cases hRecip : recips X
-        · simpa [MFalse, hXB, hRecip] using
+        · simpa [MFalse, hXB, hRecip, projectDist] using
             (Classical.choose_spec (hRecipFalse X hXB hRecip)).1
         · have hNotPartFalse : ¬ participationSet PFalse X := by
             intro hPart
@@ -757,7 +813,8 @@ theorem distSemantics_if_decompose
         Mhat =
           mscIfFalse (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips false (by intro X hX; exact hX.1)
+                  B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                  (by intro X hX; exact hX.1)
             ∘ₘ MFalse := by
       funext X
       by_cases hXB : X = B
@@ -776,13 +833,16 @@ theorem distSemantics_if_decompose
               B X (choiceIfFalse (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips false (by intro Y hY; exact hY.1)) X =
+                B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro Y hY; exact hY.1)) X =
                 [AlphabetOf.mkRecv (C := C) (F := F) X
-                  (ControlPayload.setDecision false ControlPayload.ctrlPattern) B] := by
-            simpa [controlDecisionPayload] using
+                  (ControlPayload.setDecision false
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)) B] := by
+            simpa [controlDecisionPayload, taggedControlPayload] using
               (controlBroadcastMSC_recipient
                 (C := C) (F := F) (Payload := Payload)
-                B X recips false (by intro Y hY; exact hY.1) hRecip)
+                B X recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro Y hY; exact hY.1) hRecip)
           simpa [WordTuple.concat, hChoice, hCtrl, hMFalseX] using hXEq
         · have hChoice :
               mscIfFalse (C := C) (F := F) (Payload := Payload) c B X = [] :=
@@ -790,10 +850,12 @@ theorem distSemantics_if_decompose
               B X (choiceIfFalse (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips false (by intro Y hY; exact hY.1)) X = [] :=
+                B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro Y hY; exact hY.1)) X = [] :=
             controlBroadcastMSC_nonRecipient
               (C := C) (F := F) (Payload := Payload)
-              B X recips false (by intro Y hY; exact hY.1) hXB hRecip
+              B X recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+              (by intro Y hY; exact hY.1) hXB hRecip
           have hXProj :
               projectDist (L := L) (C := C) (F := F) (Payload := Payload)
                 (.ite c B PTrue PFalse) X = LocProg.eps := by
@@ -810,17 +872,20 @@ theorem distSemantics_if_decompose
           (L := L) (C := C) (F := F) (Payload := Payload)
           (mscIfFalse (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips false (by intro X hX; exact hX.1)) := by
+                  B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                  (by intro X hX; exact hX.1)) := by
       exact concat_complete_complete _ _
         (mscIfFalse_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
         (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
-          B recips false (by intro X hX; exact hX.1))
+          B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+          (by intro X hX; exact hX.1))
     have hAll :
         IsCompleteMSC
           (L := L) (C := C) (F := F) (Payload := Payload)
           (mscIfFalse (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips false (by intro X hX; exact hX.1)
+                  B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                  (by intro X hX; exact hX.1)
             ∘ₘ MFalse) := by
       simpa [hEqFalse] using hComplete
     have hCompleteFalse :
@@ -829,7 +894,8 @@ theorem distSemantics_if_decompose
         (L := L) (C := C) (F := F) (Payload := Payload)
         (mscIfFalse (C := C) (F := F) (Payload := Payload) c B
           ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips false (by intro X hX; exact hX.1))
+                B recips false (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                (by intro X hX; exact hX.1))
         MFalse hPrefixComplete hAll
     have hNoTrue :
         ¬ (∃ MTrue,
@@ -838,14 +904,15 @@ theorem distSemantics_if_decompose
           Mhat =
             mscIfTrue (C := C) (F := F) (Payload := Payload) c B
               ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                    B recips true (by intro X hX; exact hX.1)
+                    B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse)
+                    (by intro X hX; exact hX.1)
               ∘ₘ MTrue) := by
       rintro ⟨MTrue, _hDistTrue, hEqTrue'⟩
       have hBTrue :
           Mhat B =
             AlphabetOf.mkIfTrue (C := C) (F := F) (Payload := Payload) B c ::
               (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-                B recips true ++ MTrue B) := by
+                B recips true (ifControlTag (Payload := Payload) c B PTrue PFalse) ++ MTrue B) := by
         have hB := congrFun hEqTrue' B
         simpa [WordTuple.concat, mscIfTrue, choiceIfTrue, controlBroadcastMSC_decider,
           List.append_assoc] using hB
@@ -1025,6 +1092,7 @@ theorem distSemantics_project_if_true
               B
               (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
               true
+              (ifControlTag (Payload := Payload) c B PTrue PFalse)
               (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                 B PTrue PFalse)
         ∘ₘ MTrue) := by
@@ -1042,13 +1110,14 @@ theorem distSemantics_project_if_true
               ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                   X
                   (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-                  true)
+                  true (ifControlTag (Payload := Payload) c X PTrue PFalse))
                 ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue) u ∧
             ((mscIfTrue (C := C) (F := F) (Payload := Payload) c X
                 ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
                     X
                     (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
                     true
+                    (ifControlTag (Payload := Payload) c X PTrue PFalse)
                     (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                       X PTrue PFalse)
                 ∘ₘ MTrue) X) =
@@ -1056,19 +1125,19 @@ theorem distSemantics_project_if_true
           ⟨(controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
               X
               (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-              true)
+              true (ifControlTag (Payload := Payload) c X PTrue PFalse))
             ++ MTrue X,
             localTraceSemantics_seq_intro
               (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                 X
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-                true)
+                true (ifControlTag (Payload := Payload) c X PTrue PFalse))
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PTrue)
               _ _
               (controlBroadcast_trace (L := L) (C := C) (F := F) (Payload := Payload)
                 X
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-                true)
+                true (ifControlTag (Payload := Payload) c X PTrue PFalse))
               (hTraceTrue X),
             by
               simp [WordTuple.concat, mscIfTrue, choiceIfTrue,
@@ -1087,11 +1156,13 @@ theorem distSemantics_project_if_true
                         B
                         (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                         true
+                        (ifControlTag (Payload := Payload) c B PTrue PFalse)
                         (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                           B PTrue PFalse)
                   ∘ₘ MTrue) X) =
                 AlphabetOf.mkRecv (C := C) (F := F) X
-                  (ControlPayload.setDecision true ControlPayload.ctrlPattern) B :: u from
+                  (ControlPayload.setDecision true
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)) B :: u from
             ⟨MTrue X, hTraceTrue X, by
               have hChoice :
                   mscIfTrue (C := C) (F := F) (Payload := Payload) c B X = [] :=
@@ -1102,17 +1173,22 @@ theorem distSemantics_project_if_true
                     B
                     (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                     true
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)
                     (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                       B PTrue PFalse)) X =
                   [AlphabetOf.mkRecv (C := C) (F := F) X
-                    (ControlPayload.setDecision true ControlPayload.ctrlPattern) B] :=
-                controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
+                    (ControlPayload.setDecision true
+                      (ifControlTag (Payload := Payload) c B PTrue PFalse)) B] :=
+                by
+                  simpa [controlDecisionPayload, taggedControlPayload] using
+                    (controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
                   B X
                   (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                   true
+                  (ifControlTag (Payload := Payload) c B PTrue PFalse)
                   (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                     B PTrue PFalse)
-                  hRecip
+                  hRecip)
               simp [WordTuple.concat, hChoice, hCtrl]⟩))
       · have hNoPartTrue : ¬ participationSet PTrue X := by
           intro hPart
@@ -1127,12 +1203,14 @@ theorem distSemantics_project_if_true
               B
               (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
               true
+              (ifControlTag (Payload := Payload) c B PTrue PFalse)
               (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                 B PTrue PFalse)) X = [] :=
           controlBroadcastMSC_nonRecipient (C := C) (F := F) (Payload := Payload)
             B X
             (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
             true
+            (ifControlTag (Payload := Payload) c B PTrue PFalse)
             (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
               B PTrue PFalse)
             hXB' hRecip
@@ -1142,6 +1220,7 @@ theorem distSemantics_project_if_true
                     B
                     (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                     true
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)
                     (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                       B PTrue PFalse)
               ∘ₘ MTrue) X = [] := by
@@ -1160,6 +1239,7 @@ theorem distSemantics_project_if_true
           B
           (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
           true
+          (ifControlTag (Payload := Payload) c B PTrue PFalse)
           (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
             B PTrue PFalse))
     · exact hCompleteTrue
@@ -1178,6 +1258,7 @@ theorem distSemantics_project_if_false
               B
               (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
               false
+              (ifControlTag (Payload := Payload) c B PTrue PFalse)
               (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                 B PTrue PFalse)
         ∘ₘ MFalse) := by
@@ -1195,13 +1276,14 @@ theorem distSemantics_project_if_false
               ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                   X
                   (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-                  false)
+                  false (ifControlTag (Payload := Payload) c X PTrue PFalse))
                 ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse) u ∧
             ((mscIfFalse (C := C) (F := F) (Payload := Payload) c X
                 ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
                     X
                     (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
                     false
+                    (ifControlTag (Payload := Payload) c X PTrue PFalse)
                     (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                       X PTrue PFalse)
                 ∘ₘ MFalse) X) =
@@ -1209,19 +1291,19 @@ theorem distSemantics_project_if_false
           ⟨(controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
               X
               (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-              false)
+              false (ifControlTag (Payload := Payload) c X PTrue PFalse))
             ++ MFalse X,
             localTraceSemantics_seq_intro
               (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                 X
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-                false)
+                false (ifControlTag (Payload := Payload) c X PTrue PFalse))
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PFalse)
               _ _
               (controlBroadcast_trace (L := L) (C := C) (F := F) (Payload := Payload)
                 X
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) X PTrue PFalse)
-                false)
+                false (ifControlTag (Payload := Payload) c X PTrue PFalse))
               (hTraceFalse X),
             by
               simp [WordTuple.concat, mscIfFalse, choiceIfFalse,
@@ -1240,11 +1322,13 @@ theorem distSemantics_project_if_false
                         B
                         (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                         false
+                        (ifControlTag (Payload := Payload) c B PTrue PFalse)
                         (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                           B PTrue PFalse)
                   ∘ₘ MFalse) X) =
                 AlphabetOf.mkRecv (C := C) (F := F) X
-                  (ControlPayload.setDecision false ControlPayload.ctrlPattern) B :: u from
+                  (ControlPayload.setDecision false
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)) B :: u from
             ⟨MFalse X, hTraceFalse X, by
               have hChoice :
                   mscIfFalse (C := C) (F := F) (Payload := Payload) c B X = [] :=
@@ -1255,17 +1339,22 @@ theorem distSemantics_project_if_false
                     B
                     (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                     false
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)
                     (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                       B PTrue PFalse)) X =
                   [AlphabetOf.mkRecv (C := C) (F := F) X
-                    (ControlPayload.setDecision false ControlPayload.ctrlPattern) B] :=
-                controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
+                    (ControlPayload.setDecision false
+                      (ifControlTag (Payload := Payload) c B PTrue PFalse)) B] :=
+                by
+                  simpa [controlDecisionPayload, taggedControlPayload] using
+                    (controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
                   B X
                   (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                   false
+                  (ifControlTag (Payload := Payload) c B PTrue PFalse)
                   (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                     B PTrue PFalse)
-                  hRecip
+                  hRecip)
               simp [WordTuple.concat, hChoice, hCtrl]⟩))
       · have hNoPartFalse : ¬ participationSet PFalse X := by
           intro hPart
@@ -1280,12 +1369,14 @@ theorem distSemantics_project_if_false
               B
               (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
               false
+              (ifControlTag (Payload := Payload) c B PTrue PFalse)
               (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                 B PTrue PFalse)) X = [] :=
           controlBroadcastMSC_nonRecipient (C := C) (F := F) (Payload := Payload)
             B X
             (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
             false
+            (ifControlTag (Payload := Payload) c B PTrue PFalse)
             (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
               B PTrue PFalse)
             hXB' hRecip
@@ -1295,6 +1386,7 @@ theorem distSemantics_project_if_false
                     B
                     (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                     false
+                    (ifControlTag (Payload := Payload) c B PTrue PFalse)
                     (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                       B PTrue PFalse)
               ∘ₘ MFalse) X = [] := by
@@ -1313,6 +1405,7 @@ theorem distSemantics_project_if_false
           B
           (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
           false
+          (ifControlTag (Payload := Payload) c B PTrue PFalse)
           (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
             B PTrue PFalse))
     · exact hCompleteFalse
@@ -1347,8 +1440,9 @@ theorem distSemantics_while_decompose
                 ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
                       B
                       (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
-                        B PBody PExit)
+                      B PBody PExit)
                       true
+                      (whileControlTag (Payload := Payload) c B PBody PExit)
                       (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                         B PBody PExit)
                 ∘ₘ bodiesHat i) ++
@@ -1356,8 +1450,9 @@ theorem distSemantics_while_decompose
                 ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
                       B
                       (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
-                        B PBody PExit)
+                      B PBody PExit)
                       false
+                      (whileControlTag (Payload := Payload) c B PBody PExit)
                       (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                         B PBody PExit)
                 ∘ₘ exitHat]) := by
@@ -1380,8 +1475,9 @@ theorem distSemantics_while_decompose
                 ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
                       B
                       (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
-                        B PBody PExit)
+                      B PBody PExit)
                       true
+                      (whileControlTag (Payload := Payload) c B PBody PExit)
                       (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                         B PBody PExit)
                 ∘ₘ bodiesHat i) ++
@@ -1389,8 +1485,9 @@ theorem distSemantics_while_decompose
                 ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
                       B
                       (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
-                        B PBody PExit)
+                      B PBody PExit)
                       false
+                      (whileControlTag (Payload := Payload) c B PBody PExit)
                       (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                         B PBody PExit)
                 ∘ₘ exitHat])
@@ -1416,18 +1513,22 @@ theorem distSemantics_while_decompose
       projectDist (L := L) (C := C) (F := F) (Payload := Payload)
         (.whileLoop c B PBody PExit) B =
         LocProg.localWhile c
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips true)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips true (whileControlTag (Payload := Payload) c B PBody PExit))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PBody)
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips false)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips false (whileControlTag (Payload := Payload) c B PBody PExit))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PExit) := by
     simp [projectDist, project, recips]
   have hBTrace :
       localTraceSemantics
         (L := L) (C := C) (F := F) (Payload := Payload)
         (LocProg.localWhile c
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips true)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips true (whileControlTag (Payload := Payload) c B PBody PExit))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PBody)
-          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips false)
+          ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+              B recips false (whileControlTag (Payload := Payload) c B PBody PExit))
             ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PExit))
         (Mhat B) := by
     rw [← hBProj]
@@ -1435,9 +1536,11 @@ theorem distSemantics_while_decompose
   rcases (localTraceSemantics_localWhile_unfold
       (L := L) (C := C) (F := F) (Payload := Payload)
       c
-      ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips true)
+      ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+          B recips true (whileControlTag (Payload := Payload) c B PBody PExit))
         ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PBody)
-      ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) B recips false)
+      ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
+          B recips false (whileControlTag (Payload := Payload) c B PBody PExit))
         ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) B PExit)
       (Mhat B)).mp hBTrace with
     ⟨exitWordB, hExitSeqB, hMB⟩ | ⟨bodyWordB, restB, hBodySeqB, hRestB, hMB⟩
@@ -1445,15 +1548,15 @@ theorem distSemantics_while_decompose
     have hSWord :
         sB =
           controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-            B recips false :=
+            B recips false (whileControlTag (Payload := Payload) c B PBody PExit) :=
       controlBroadcast_trace_eq
         (L := L) (C := C) (F := F) (Payload := Payload)
-        B recips false sB hsB
+        B recips false (whileControlTag (Payload := Payload) c B PBody PExit) sB hsB
     have hMB' :
         Mhat B =
           AlphabetOf.mkWhileFalse (C := C) (F := F) (Payload := Payload) B c ::
             (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-              B recips false ++ rB) := by
+              B recips false (whileControlTag (Payload := Payload) c B PBody PExit) ++ rB) := by
       simpa [hExitEqB, hSWord, List.cons_append, List.append_assoc] using hMB
     have hRecipExit :
         ∀ X, X ≠ B → recips X →
@@ -1463,19 +1566,20 @@ theorem distSemantics_while_decompose
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit) uX ∧
             Mhat X =
               AlphabetOf.mkRecv (C := C) (F := F) X
-                (ControlPayload.setDecision false ControlPayload.ctrlPattern) B :: uX := by
+                (ControlPayload.setDecision false
+                  (whileControlTag (Payload := Payload) c B PBody PExit)) B :: uX := by
       intro X hXB hRecip
       have hXProj :
           projectDist (L := L) (C := C) (F := F) (Payload := Payload)
             (.whileLoop c B PBody PExit) X =
-            LocProg.recvWhile ControlPayload.ctrlPattern B
+            LocProg.recvWhile (whileControlTag (Payload := Payload) c B PBody PExit) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit) := by
         simp [projectDist, project, recips, hXB, hRecip]
       have hXTrace :
           localTraceSemantics
             (L := L) (C := C) (F := F) (Payload := Payload)
-            (LocProg.recvWhile ControlPayload.ctrlPattern B
+            (LocProg.recvWhile (whileControlTag (Payload := Payload) c B PBody PExit) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit))
             (Mhat X) := by
@@ -1483,7 +1587,7 @@ theorem distSemantics_while_decompose
         exact hTrace X
       rcases (localTraceSemantics_recvWhile_unfold
           (L := L) (C := C) (F := F) (Payload := Payload)
-          ControlPayload.ctrlPattern B
+          (whileControlTag (Payload := Payload) c B PBody PExit) B
           (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
           (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit)
           (Mhat X)).mp hXTrace with
@@ -1515,7 +1619,7 @@ theorem distSemantics_while_decompose
         dsimp [exitHat]
         simp [projectDist, hrB]
       · by_cases hRecip : recips X
-        · simpa [exitHat, hXB, hRecip] using
+        · simpa [exitHat, hXB, hRecip, projectDist] using
             (Classical.choose_spec (hRecipExit X hXB hRecip)).1
         · have hNotPartExit : ¬ participationSet PExit X := by
             intro hPart
@@ -1528,7 +1632,8 @@ theorem distSemantics_while_decompose
         Mhat =
           mscWhileFalse (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips false (whileRecipients_no_self
+                  B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                  (whileRecipients_no_self
                     (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
             ∘ₘ exitHat := by
       funext X
@@ -1549,14 +1654,17 @@ theorem distSemantics_while_decompose
               B X (choiceWhileFalse (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips false (whileRecipients_no_self
+                B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)) X =
                 [AlphabetOf.mkRecv (C := C) (F := F) X
-                  (ControlPayload.setDecision false ControlPayload.ctrlPattern) B] := by
-            simpa [controlDecisionPayload] using
+                  (ControlPayload.setDecision false
+                    (whileControlTag (Payload := Payload) c B PBody PExit)) B] := by
+            simpa [controlDecisionPayload, taggedControlPayload] using
               (controlBroadcastMSC_recipient
                 (C := C) (F := F) (Payload := Payload)
-                B X recips false (whileRecipients_no_self
+                B X recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
                 hRecip)
           simpa [WordTuple.concat, hChoice, hCtrl, hExitHatX] using hXEq
@@ -1566,11 +1674,13 @@ theorem distSemantics_while_decompose
               B X (choiceWhileFalse (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips false (whileRecipients_no_self
+                B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)) X = [] :=
             controlBroadcastMSC_nonRecipient
               (C := C) (F := F) (Payload := Payload)
-              B X recips false (whileRecipients_no_self
+              B X recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+              (whileRecipients_no_self
                 (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
               hXB hRecip
           have hXProj :
@@ -1589,19 +1699,22 @@ theorem distSemantics_while_decompose
           (L := L) (C := C) (F := F) (Payload := Payload)
           (mscWhileFalse (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips false (whileRecipients_no_self
+                  B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                  (whileRecipients_no_self
                     (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)) := by
       exact concat_complete_complete _ _
         (mscWhileFalse_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
         (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
-          B recips false (whileRecipients_no_self
+          B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+          (whileRecipients_no_self
             (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit))
     have hAll :
         IsCompleteMSC
           (L := L) (C := C) (F := F) (Payload := Payload)
           (mscWhileFalse (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips false (whileRecipients_no_self
+                  B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                  (whileRecipients_no_self
                     (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
             ∘ₘ exitHat) := by
       simpa [hEqExit] using hComplete
@@ -1611,7 +1724,8 @@ theorem distSemantics_while_decompose
         (L := L) (C := C) (F := F) (Payload := Payload)
         (mscWhileFalse (C := C) (F := F) (Payload := Payload) c B
           ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips false (whileRecipients_no_self
+                B recips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit))
         exitHat hPrefixComplete hAll
     refine ⟨0, Fin.elim0, ?_, exitHat, ⟨hTraceExit, hCompleteExit⟩, ?_⟩
@@ -1622,15 +1736,16 @@ theorem distSemantics_while_decompose
     have hSWord :
         sB =
           controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-            B recips true :=
+            B recips true (whileControlTag (Payload := Payload) c B PBody PExit) :=
       controlBroadcast_trace_eq
         (L := L) (C := C) (F := F) (Payload := Payload)
-        B recips true sB hsB
+        B recips true (whileControlTag (Payload := Payload) c B PBody PExit) sB hsB
     have hMB' :
         Mhat B =
           AlphabetOf.mkWhileTrue (C := C) (F := F) (Payload := Payload) B c ::
             (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-              B recips true ++ rB ++ restB) := by
+              B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                ++ rB ++ restB) := by
       simpa [hBodyEqB, hSWord, List.cons_append, List.append_assoc] using hMB
     have hRecipBodyRest :
         ∀ X, X ≠ B → recips X →
@@ -1645,20 +1760,21 @@ theorem distSemantics_while_decompose
                 (.whileLoop c B PBody PExit) X) restX ∧
             Mhat X =
               AlphabetOf.mkRecv (C := C) (F := F) X
-                (ControlPayload.setDecision true ControlPayload.ctrlPattern) B ::
+                (ControlPayload.setDecision true
+                  (whileControlTag (Payload := Payload) c B PBody PExit)) B ::
                 bodyX ++ restX := by
       intro X hXB hRecip
       have hXProj :
           projectDist (L := L) (C := C) (F := F) (Payload := Payload)
             (.whileLoop c B PBody PExit) X =
-            LocProg.recvWhile ControlPayload.ctrlPattern B
+            LocProg.recvWhile (whileControlTag (Payload := Payload) c B PBody PExit) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit) := by
         simp [projectDist, project, recips, hXB, hRecip]
       have hXTrace :
           localTraceSemantics
             (L := L) (C := C) (F := F) (Payload := Payload)
-            (LocProg.recvWhile ControlPayload.ctrlPattern B
+            (LocProg.recvWhile (whileControlTag (Payload := Payload) c B PBody PExit) B
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
               (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit))
             (Mhat X) := by
@@ -1666,7 +1782,7 @@ theorem distSemantics_while_decompose
         exact hTrace X
       rcases (localTraceSemantics_recvWhile_unfold
           (L := L) (C := C) (F := F) (Payload := Payload)
-          ControlPayload.ctrlPattern B
+          (whileControlTag (Payload := Payload) c B PBody PExit) B
           (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
           (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit)
           (Mhat X)).mp hXTrace with
@@ -1709,7 +1825,7 @@ theorem distSemantics_while_decompose
         dsimp [MBody]
         simp [projectDist, hrB]
       · by_cases hRecip : recips X
-        · simpa [MBody, hXB, hRecip] using
+        · simpa [MBody, hXB, hRecip, projectDist] using
             (Classical.choose_spec (hRecipBodyRest X hXB hRecip)).1
         · have hNotPartBody : ¬ participationSet PBody X := by
             intro hPart
@@ -1746,7 +1862,8 @@ theorem distSemantics_while_decompose
         Mhat =
           mscWhileTrue (C := C) (F := F) (Payload := Payload) c B
             ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                  B recips true (whileRecipients_no_self
+                  B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                  (whileRecipients_no_self
                     (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
             ∘ₘ MBody ∘ₘ MRest := by
       funext X
@@ -1773,14 +1890,17 @@ theorem distSemantics_while_decompose
               B X (choiceWhileTrue (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips true (whileRecipients_no_self
+                B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)) X =
                 [AlphabetOf.mkRecv (C := C) (F := F) X
-                  (ControlPayload.setDecision true ControlPayload.ctrlPattern) B] := by
-            simpa [controlDecisionPayload] using
+                  (ControlPayload.setDecision true
+                    (whileControlTag (Payload := Payload) c B PBody PExit)) B] := by
+            simpa [controlDecisionPayload, taggedControlPayload] using
               (controlBroadcastMSC_recipient
                 (C := C) (F := F) (Payload := Payload)
-                B X recips true (whileRecipients_no_self
+                B X recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
                 hRecip)
           simpa [WordTuple.concat, hChoice, hCtrl, hBodyX, hRestX,
@@ -1791,11 +1911,13 @@ theorem distSemantics_while_decompose
               B X (choiceWhileTrue (C := C) (F := F) (Payload := Payload) c B) hXB
           have hCtrl :
               (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                B recips true (whileRecipients_no_self
+                B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                (whileRecipients_no_self
                   (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)) X = [] :=
             controlBroadcastMSC_nonRecipient
               (C := C) (F := F) (Payload := Payload)
-              B X recips true (whileRecipients_no_self
+              B X recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+              (whileRecipients_no_self
                 (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
               hXB hRecip
           have hXProj :
@@ -1814,14 +1936,16 @@ theorem distSemantics_while_decompose
     let stepPrefix : WordTuple L C F Payload :=
       mscWhileTrue (C := C) (F := F) (Payload := Payload) c B
         ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-              B recips true (whileRecipients_no_self
+              B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+              (whileRecipients_no_self
                 (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
     have hStepPrefixComplete :
         IsCompleteMSC (L := L) (C := C) (F := F) (Payload := Payload) stepPrefix := by
       exact concat_complete_complete _ _
         (mscWhileTrue_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
         (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
-          B recips true (whileRecipients_no_self
+          B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+          (whileRecipients_no_self
             (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit))
     have hMSCBodyRest :
         IsMSC (L := L) (C := C) (F := F) (Payload := Payload) (MBody ∘ₘ MRest) :=
@@ -1892,7 +2016,8 @@ theorem distSemantics_while_decompose
         Mhat =
             (mscWhileTrue (C := C) (F := F) (Payload := Payload) c B
               ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                    B recips true (whileRecipients_no_self
+                    B recips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                    (whileRecipients_no_self
                       (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
               ∘ₘ MBody) ∘ₘ MRest := by
                 simpa [WordTuple.concat_assoc] using hEqStep
@@ -1905,6 +2030,7 @@ theorem distSemantics_while_decompose
                         (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
                           B PBody PExit)
                         true
+                        (whileControlTag (Payload := Payload) c B PBody PExit)
                         (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                           B PBody PExit)
                   ∘ₘ bodiesHat i) ++
@@ -1914,6 +2040,7 @@ theorem distSemantics_while_decompose
                         (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
                           B PBody PExit)
                         false
+                        (whileControlTag (Payload := Payload) c B PBody PExit)
                         (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                           B PBody PExit)
                   ∘ₘ exitHat]) := by
@@ -1984,6 +2111,7 @@ theorem realization_complete
                 B
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                 true
+                (ifControlTag (Payload := Payload) c B PTrue PFalse)
                 (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                   B PTrue PFalse)
             ∘ₘ MhatTrue,
@@ -2000,6 +2128,7 @@ theorem realization_complete
                 B
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
                 false
+                (ifControlTag (Payload := Payload) c B PTrue PFalse)
                 (ifRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                   B PTrue PFalse)
             ∘ₘ MhatFalse,
@@ -2037,11 +2166,15 @@ theorem realization_complete
       let bodyStep : Fin k → WordTuple L C F Payload :=
         fun i =>
           mscWhileTrue (C := C) (F := F) (Payload := Payload) c B
-            ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload) B bodyRecips true hBodyRecips
+            ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
+                  B bodyRecips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                  hBodyRecips
             ∘ₘ bodyHats i
       let exitStep : WordTuple L C F Payload :=
         mscWhileFalse (C := C) (F := F) (Payload := Payload) c B
-          ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload) B bodyRecips false hBodyRecips
+          ∘ₘ controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
+                B bodyRecips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                hBodyRecips
           ∘ₘ exitHat
       refine ⟨WordTuple.concatList (List.ofFn bodyStep ++ [exitStep]), ?_, ?_⟩
       · refine ⟨?_, ?_⟩
@@ -2058,14 +2191,14 @@ theorem realization_complete
                 (∀ i, localTraceSemantics
                   (L := L) (C := C) (F := F) (Payload := Payload)
                   ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
-                      X bodyRecips true)
+                      X bodyRecips true (whileControlTag (Payload := Payload) c X PBody PExit))
                     ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
                   (bodies' i)) ∧
                 ∃ exitWord,
                   localTraceSemantics
                     (L := L) (C := C) (F := F) (Payload := Payload)
                     ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
-                        X bodyRecips false)
+                        X bodyRecips false (whileControlTag (Payload := Payload) c X PBody PExit))
                       ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) X PExit)
                     exitWord ∧
                   WordTuple.concatList (List.ofFn bodyStep ++ [exitStep]) X =
@@ -2080,26 +2213,28 @@ theorem realization_complete
                 ⟨k,
                   (fun i =>
                     (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-                      X bodyRecips true) ++ bodyHats i X),
+                      X bodyRecips true (whileControlTag (Payload := Payload) c X PBody PExit)) ++
+                      bodyHats i X),
                   (by
                     intro i
                     exact localTraceSemantics_seq_intro
                       (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
-                        X bodyRecips true)
+                        X bodyRecips true (whileControlTag (Payload := Payload) c X PBody PExit))
                       (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
                       _ _
                       (controlBroadcast_trace (L := L) (C := C) (F := F) (Payload := Payload)
-                        X bodyRecips true)
+                        X bodyRecips true (whileControlTag (Payload := Payload) c X PBody PExit))
                       ((hBodyDist i).1 X)),
                   (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-                      X bodyRecips false) ++ exitHat X,
+                      X bodyRecips false (whileControlTag (Payload := Payload) c X PBody PExit)) ++
+                      exitHat X,
                   localTraceSemantics_seq_intro
                     (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
-                      X bodyRecips false)
+                      X bodyRecips false (whileControlTag (Payload := Payload) c X PBody PExit))
                     (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit)
                     _ _
                     (controlBroadcast_trace (L := L) (C := C) (F := F) (Payload := Payload)
-                      X bodyRecips false)
+                      X bodyRecips false (whileControlTag (Payload := Payload) c X PBody PExit))
                     (hExitDist.1 X),
                   by
                     have hBodyMap :
@@ -2107,7 +2242,9 @@ theorem realization_complete
                           List.ofFn (fun i =>
                             AlphabetOf.mkWhileTrue (C := C) (F := F) (Payload := Payload) X c
                               :: (controlBroadcastWord (L := L) (C := C) (F := F)
-                                    (Payload := Payload) X bodyRecips true ++ bodyHats i X)) := by
+                                    (Payload := Payload) X bodyRecips true
+                                    (whileControlTag (Payload := Payload) c X PBody PExit) ++
+                                    bodyHats i X)) := by
                       ext i
                       simp [bodyStep, WordTuple.concat, mscWhileTrue, choiceWhileTrue,
                         controlBroadcastMSC_decider, List.append_assoc]
@@ -2115,7 +2252,9 @@ theorem realization_complete
                         exitStep X =
                           AlphabetOf.mkWhileFalse (C := C) (F := F) (Payload := Payload) X c
                             :: (controlBroadcastWord (L := L) (C := C) (F := F)
-                                  (Payload := Payload) X bodyRecips false ++ exitHat X) := by
+                                  (Payload := Payload) X bodyRecips false
+                                  (whileControlTag (Payload := Payload) c X PBody PExit) ++
+                                  exitHat X) := by
                       simp [exitStep, WordTuple.concat, mscWhileFalse, choiceWhileFalse,
                         controlBroadcastMSC_decider, List.append_assoc]
                     rw [concatList_apply, List.map_append, hBodyMap]
@@ -2143,11 +2282,13 @@ theorem realization_complete
                         (C := C) (F := F) (Payload := Payload)
                         (List.ofFn (fun i =>
                           AlphabetOf.mkRecv (C := C) (F := F) X
-                            (ControlPayload.setDecision true ControlPayload.ctrlPattern) B
+                            (ControlPayload.setDecision true
+                              (whileControlTag (Payload := Payload) c B PBody PExit)) B
                             :: bodies' i))
                       ++
                       (AlphabetOf.mkRecv (C := C) (F := F) X
-                        (ControlPayload.setDecision false ControlPayload.ctrlPattern) B
+                        (ControlPayload.setDecision false
+                          (whileControlTag (Payload := Payload) c B PBody PExit)) B
                         :: exitWord) := by
                   exact ⟨k, (fun i => bodyHats i X), (by intro i; exact (hBodyDist i).1 X),
                     exitHat X, (hExitDist.1 X),
@@ -2156,7 +2297,8 @@ theorem realization_complete
                           List.map (fun M => M X) (List.ofFn bodyStep) =
                             List.ofFn (fun i =>
                               AlphabetOf.mkRecv (C := C) (F := F) X
-                                (ControlPayload.setDecision true ControlPayload.ctrlPattern) B
+                                (ControlPayload.setDecision true
+                                  (whileControlTag (Payload := Payload) c B PBody PExit)) B
                                   :: bodyHats i X) := by
                         ext i
                         have hChoice :
@@ -2165,16 +2307,23 @@ theorem realization_complete
                             B X (choiceWhileTrue (C := C) (F := F) (Payload := Payload) c B) hXB
                         have hCtrl :
                             (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                              B bodyRecips true hBodyRecips) X =
+                              B bodyRecips true
+                              (whileControlTag (Payload := Payload) c B PBody PExit)
+                              hBodyRecips) X =
                             [AlphabetOf.mkRecv (C := C) (F := F) X
-                              (ControlPayload.setDecision true ControlPayload.ctrlPattern) B] :=
-                          controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
-                            B X bodyRecips true hBodyRecips hRecip
+                              (ControlPayload.setDecision true
+                                (whileControlTag (Payload := Payload) c B PBody PExit)) B] := by
+                          simpa [controlDecisionPayload, taggedControlPayload] using
+                            (controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
+                              B X bodyRecips true
+                              (whileControlTag (Payload := Payload) c B PBody PExit)
+                              hBodyRecips hRecip)
                         simp [bodyStep, WordTuple.concat, hChoice, hCtrl]
                       have hExitWord :
                           exitStep X =
                             AlphabetOf.mkRecv (C := C) (F := F) X
-                              (ControlPayload.setDecision false ControlPayload.ctrlPattern) B
+                              (ControlPayload.setDecision false
+                                (whileControlTag (Payload := Payload) c B PBody PExit)) B
                                 :: exitHat X := by
                         have hChoice :
                             mscWhileFalse (C := C) (F := F) (Payload := Payload) c B X = [] :=
@@ -2182,11 +2331,17 @@ theorem realization_complete
                             B X (choiceWhileFalse (C := C) (F := F) (Payload := Payload) c B) hXB
                         have hCtrl :
                             (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                              B bodyRecips false hBodyRecips) X =
+                              B bodyRecips false
+                              (whileControlTag (Payload := Payload) c B PBody PExit)
+                              hBodyRecips) X =
                             [AlphabetOf.mkRecv (C := C) (F := F) X
-                              (ControlPayload.setDecision false ControlPayload.ctrlPattern) B] :=
-                          controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
-                            B X bodyRecips false hBodyRecips hRecip
+                              (ControlPayload.setDecision false
+                                (whileControlTag (Payload := Payload) c B PBody PExit)) B] := by
+                          simpa [controlDecisionPayload, taggedControlPayload] using
+                            (controlBroadcastMSC_recipient (C := C) (F := F) (Payload := Payload)
+                              B X bodyRecips false
+                              (whileControlTag (Payload := Payload) c B PBody PExit)
+                              hBodyRecips hRecip)
                         simp [exitStep, WordTuple.concat, hChoice, hCtrl]
                       rw [concatList_apply, List.map_append, hBodyMap]
                       simp [hExitWord, concatLocalWords_append, concatLocalWords_cons,
@@ -2194,7 +2349,7 @@ theorem realization_complete
               have hProj :
                   projectDist (L := L) (C := C) (F := F) (Payload := Payload)
                     (.whileLoop c B PBody PExit) X =
-                  LocProg.recvWhile ControlPayload.ctrlPattern B
+                  LocProg.recvWhile (whileControlTag (Payload := Payload) c B PBody PExit) B
                     (project (L := L) (C := C) (F := F) (Payload := Payload) X PBody)
                     (project (L := L) (C := C) (F := F) (Payload := Payload) X PExit) := by
                 simp [projectDist, project, hXB, hRecip']
@@ -2224,9 +2379,12 @@ theorem realization_complete
                     B X (choiceWhileTrue (C := C) (F := F) (Payload := Payload) c B) hXB'
                 have hCtrl :
                     (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                      B bodyRecips true hBodyRecips) X = [] :=
+                      B bodyRecips true
+                      (whileControlTag (Payload := Payload) c B PBody PExit)
+                      hBodyRecips) X = [] :=
                   controlBroadcastMSC_nonRecipient (C := C) (F := F) (Payload := Payload)
-                    B X bodyRecips true hBodyRecips hXB' hRecip
+                    B X bodyRecips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                    hBodyRecips hXB' hRecip
                 simp [bodyStep, WordTuple.concat, hChoice, hCtrl, hBodyNil i]
               have hExitStepNil : exitStep X = [] := by
                 have hChoice :
@@ -2235,9 +2393,12 @@ theorem realization_complete
                     B X (choiceWhileFalse (C := C) (F := F) (Payload := Payload) c B) hXB'
                 have hCtrl :
                     (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-                      B bodyRecips false hBodyRecips) X = [] :=
+                      B bodyRecips false
+                      (whileControlTag (Payload := Payload) c B PBody PExit)
+                      hBodyRecips) X = [] :=
                   controlBroadcastMSC_nonRecipient (C := C) (F := F) (Payload := Payload)
-                    B X bodyRecips false hBodyRecips hXB' hRecip
+                    B X bodyRecips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                    hBodyRecips hXB' hRecip
                 simp [exitStep, WordTuple.concat, hChoice, hCtrl, hExitNil]
               have hBodyWordMap :
                   List.map (fun M => M X) (List.ofFn bodyStep) =
@@ -2283,14 +2444,16 @@ theorem realization_complete
               (concat_complete_complete _ _
                 (mscWhileTrue_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
                 (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
-                  B bodyRecips true hBodyRecips))
+                  B bodyRecips true (whileControlTag (Payload := Payload) c B PBody PExit)
+                  hBodyRecips))
               ((hBodyDist i).2)
           have hExitStepComplete : IsCompleteMSC exitStep := by
             exact concat_complete_complete _ _
               (concat_complete_complete _ _
                 (mscWhileFalse_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
                 (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
-                  B bodyRecips false hBodyRecips))
+                  B bodyRecips false (whileControlTag (Payload := Payload) c B PBody PExit)
+                  hBodyRecips))
               (hExitDist.2)
           exact concatList_complete (L := L) (C := C) (F := F) (Payload := Payload)
             (List.ofFn bodyStep ++ [exitStep]) (by
@@ -2356,7 +2519,8 @@ theorem complete_locals_isCompleteMSC
     (hMSC : IsMSC (fun A => w A)) :
     IsCompleteMSC (fun A => w A) := by
   rcases uniformZipper (L := L) (C := C) (F := F) (Payload := Payload) prog
-      hWellFormed (fun A => w A) (WordTuple.empty (L := L) (C := C) (F := F) (Payload := Payload))
+      hWellFormed
+      (fun A => w A) (WordTuple.empty (L := L) (C := C) (F := F) (Payload := Payload))
       (fun A => localTrace_implies_localPrefix
         (L := L) (C := C) (F := F) (Payload := Payload)
         (project (L := L) (C := C) (F := F) (Payload := Payload) A prog)
@@ -2566,6 +2730,7 @@ theorem realization_sound
                         (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload)
                           B PBody PExit)
                         true
+                        (whileControlTag (Payload := Payload) c B PBody PExit)
                         (whileRecipients_no_self (L := L) (C := C) (F := F) (Payload := Payload)
                           B PBody PExit)
                   ∘ₘ bodiesHat i)) =

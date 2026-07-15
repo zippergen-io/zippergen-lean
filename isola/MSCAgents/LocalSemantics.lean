@@ -631,7 +631,7 @@ theorem distPrefixSemantics_seq_split
         (project (L := L) (C := C) (F := F) (Payload := Payload) X P1)
         (project (L := L) (C := C) (F := F) (Payload := Payload) X P2)
         (M X)
-        (by simpa [projectDist] using hPrefix X) with
+        (by simpa [projectDist, project] using hPrefix X) with
       ⟨u, v, huv, hu, hv, hfull⟩
     exact ⟨u, v, huv, hu, hv, hfull⟩
   let U : WordTuple L C F Payload := fun X => Classical.choose (hSplit X)
@@ -720,11 +720,11 @@ private theorem localTraceSemantics_sendList {A : L}
 
 /-- Concrete local word emitted by the decider's control broadcast. -/
 noncomputable def controlBroadcastWord
-    (A : L) (recips : L → Prop) (decision : Bool) :
+    (A : L) (recips : L → Prop) (decision : Bool) (tag : Payload) :
     LocalWord (C := C) (F := F) (Payload := Payload) A := by
   classical
   exact sendWordForTargets (L := L) (C := C) (F := F) (Payload := Payload) (A := A)
-    (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+    (taggedControlPayload decision tag)
     (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) A recips)
     (by
       intro X hX
@@ -732,17 +732,17 @@ noncomputable def controlBroadcastWord
 
 /-- The control broadcast has the expected deterministic decider trace. -/
 theorem controlBroadcast_trace
-    (A : L) (recips : L → Prop) (decision : Bool) :
+    (A : L) (recips : L → Prop) (decision : Bool) (tag : Payload) :
     localTraceSemantics
       (L := L) (C := C) (F := F) (Payload := Payload) (A := A)
-      (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) A recips decision)
-      (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload) A recips decision) := by
+      (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload) A recips decision tag)
+      (controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload) A recips decision tag) := by
   classical
   unfold controlBroadcast controlBroadcastWord
   simpa using
     (localTraceSemantics_sendList
       (L := L) (C := C) (F := F) (Payload := Payload) (A := A)
-      (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+      (taggedControlPayload decision tag)
       (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) A recips)
       (by
         intro X hX
@@ -929,12 +929,14 @@ theorem project_trace_ne_nil_of_if_participating
             ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                 A
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) A PTrue PFalse)
-                true)
+                true
+                (controlTag (Prog.ite c A PTrue PFalse)))
               ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) A PTrue)
             ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                 A
                 (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) A PTrue PFalse)
-                false)
+                false
+                (controlTag (Prog.ite c A PTrue PFalse)))
               ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) A PFalse) := by
       simp [project]
     rw [hProj] at hTrace
@@ -948,14 +950,14 @@ theorem project_trace_ne_nil_of_if_participating
     have hProj :
         project (L := L) (C := C) (F := F) (Payload := Payload) A
           (.ite c B PTrue PFalse) =
-          LocProg.recvIf ControlPayload.ctrlPattern B
+          LocProg.recvIf (controlTag (Prog.ite c B PTrue PFalse)) B
             (project (L := L) (C := C) (F := F) (Payload := Payload) A PTrue)
             (project (L := L) (C := C) (F := F) (Payload := Payload) A PFalse) := by
       simp [project, hAB, hRecip]
     rw [hProj] at hTrace
     exact localTraceSemantics_recvIf_ne_nil
       (L := L) (C := C) (F := F) (Payload := Payload)
-      ControlPayload.ctrlPattern B _ _ _ hTrace
+      (controlTag (Prog.ite c B PTrue PFalse)) B _ _ _ hTrace
 
 /-- Participating lifelines of a projected `while`-program have nonempty
     complete local traces because every such trace starts with a control
@@ -978,12 +980,14 @@ theorem project_trace_ne_nil_of_while_participating
             ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                 A
                 (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) A PBody PExit)
-                true)
+                true
+                (controlTag (Prog.whileLoop c A PBody PExit)))
               ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) A PBody)
             ((controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
                 A
                 (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) A PBody PExit)
-                false)
+                false
+                (controlTag (Prog.whileLoop c A PBody PExit)))
               ;;ₗ project (L := L) (C := C) (F := F) (Payload := Payload) A PExit) := by
       simp [project]
     rw [hProj] at hTrace
@@ -997,14 +1001,14 @@ theorem project_trace_ne_nil_of_while_participating
     have hProj :
         project (L := L) (C := C) (F := F) (Payload := Payload) A
           (.whileLoop c B PBody PExit) =
-          LocProg.recvWhile ControlPayload.ctrlPattern B
+          LocProg.recvWhile (controlTag (Prog.whileLoop c B PBody PExit)) B
             (project (L := L) (C := C) (F := F) (Payload := Payload) A PBody)
             (project (L := L) (C := C) (F := F) (Payload := Payload) A PExit) := by
       simp [project, hAB, hRecip]
     rw [hProj] at hTrace
     exact localTraceSemantics_recvWhile_ne_nil
       (L := L) (C := C) (F := F) (Payload := Payload)
-      ControlPayload.ctrlPattern B _ _ _ hTrace
+      (controlTag (Prog.whileLoop c B PBody PExit)) B _ _ _ hTrace
 
 end LocalHelpers
 

@@ -256,6 +256,26 @@ theorem firstControlDecisions_eq
       (ControlPayload.setDecision b2 ControlPayload.ctrlPattern)
       hs hr)
 
+theorem firstTaggedControlDecisions_eq
+    (M : WordTuple L C F Payload)
+    (hM : IsMSC M)
+    (A B : L) (b1 b2 : Bool) (tag1 tag2 : Payload)
+    (hs :
+      ∃ ss,
+        sendPayloads (C := C) (F := F) (Payload := Payload) B (M A) =
+          ControlPayload.setDecision b1 tag1 :: ss)
+    (hr :
+      ∃ rs,
+        recvPayloads (C := C) (F := F) (Payload := Payload) A (M B) =
+          ControlPayload.setDecision b2 tag2 :: rs) :
+    b1 = b2 := by
+  exact controlPayload_compat_decision_eq (Payload := Payload)
+    (firstPayloads_compatible (L := L) (C := C) (F := F) (Payload := Payload)
+      M hM A B
+      (ControlPayload.setDecision b1 tag1)
+      (ControlPayload.setDecision b2 tag2)
+      hs hr)
+
 end ControlHeads
 
 end MSCPredicate
@@ -830,7 +850,7 @@ theorem matchedLabelsCompatible_concat
     at hp
   have hlen :
       (sendPayloads B (M1 A)).length = (recvPayloads A (M1 B)).length := by
-    simpa [sndCount, rcvCount] using h1.complete A B
+    simpa [channelComplete, sndCount, rcvCount] using h1.complete A B
   rw [zip_append_eq_of_length_eq _ _ _ _ hlen] at hp
   rcases List.mem_append.mp hp with hp | hp
   · exact h1.labelCompat A B p hp
@@ -1174,7 +1194,7 @@ private theorem matchedLabelsCompatible_suffix
   intro A B p hp
   have hlen :
       (sendPayloads B (M1 A)).length = (recvPayloads A (M1 B)).length := by
-    simpa [sndCount, rcvCount] using h1.complete A B
+    simpa [channelComplete, sndCount, rcvCount] using h1.complete A B
   have hp' :
       p ∈ List.zip (sendPayloads B ((M1 ∘ₘ M2) A)) (recvPayloads A ((M1 ∘ₘ M2) B)) := by
     simp [WordTuple.concat, sendPayloads_append, recvPayloads_append]
@@ -1506,19 +1526,22 @@ theorem strip_complete_prefix_like_msc
             countSends_take_le
               (C := C) (F := F) (Payload := Payload) X (D A) (k A)
           have hComplete : countSends X (D A) = countRecvs A (D X) := by
-            simpa [sndCount, rcvCount] using hD.complete A X
+            simpa [channelComplete, sndCount, rcvCount] using hD.complete A X
           omega
         · have hAD : (D A).take (k A) = D A := hTakeD_of_full hAFull
           rw [hAD]
           have hComplete : countSends X (D A) = countRecvs A (D X) := by
-            simpa [sndCount, rcvCount] using hD.complete A X
+            simpa [channelComplete, sndCount, rcvCount] using hD.complete A X
           omega
       rw [hRecvD] at hSurplusD
       omega
-  simpa [stripDecisionPrefix, k] using
+  change IsMSC (L := L) (C := C) (F := F) (Payload := Payload)
+    (fun A => (M A).drop (Nat.min (D A).length (M A).length))
+  simpa [k] using
     suffix_msc_of_safe_prefix
       (L := L) (C := C) (F := F) (Payload := Payload)
       M k hkM hPrefixLe hSendSurplusDead hM
+
 
 /-- Restrict a ranking on `M1 ∘ₘ M2` to the suffix `M2` by shifting event
     positions past the complete prefix `M1`. -/

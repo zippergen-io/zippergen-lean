@@ -15,6 +15,7 @@ open Lake DSL
 package «MSCAgents» where
 
 -- The library root is MSCAgents; Lean files live in MSCAgents/*.lean
+@[default_target]
 lean_lib «MSCAgents» where
   srcDir := "."
   globs := #[.submodules `MSCAgents]

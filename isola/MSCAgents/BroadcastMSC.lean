@@ -12,13 +12,13 @@ section BroadcastMSC
 variable {L C F Payload : Type} [DecidableEq L] [Fintype L]
 variable [PayloadCompatiblePred Payload] [ControlPayloadSpec Payload]
 
-/-- The payload used by a control broadcast with decision `ν`. -/
-def controlDecisionPayload (decision : Bool) : Payload :=
-  ControlPayload.setDecision decision ControlPayload.ctrlPattern
+/-- The payload used by a control broadcast with decision `ν` and syntactic tag. -/
+def controlDecisionPayload (decision : Bool) (tag : Payload) : Payload :=
+  taggedControlPayload decision tag
 
 /-- The list of canonical control-message MSCs used in a broadcast. -/
 noncomputable def controlBroadcastSteps
-    (B : L) (recips : L → Prop) (decision : Bool)
+    (B : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ X, recips X → X ≠ B) :
     List (WordTuple L C F Payload) := by
   classical
@@ -28,42 +28,29 @@ noncomputable def controlBroadcastSteps
       let hX : recips X.1 :=
         (mem_controlRecipients (C := C) (F := F) (Payload := Payload)).mp X.2
       mscMsg (C := C) (F := F)
-        B (controlDecisionPayload (Payload := Payload) decision)
-        X.1 (controlDecisionPayload (Payload := Payload) decision)
+        B (controlDecisionPayload (Payload := Payload) decision tag)
+        X.1 (controlDecisionPayload (Payload := Payload) decision tag)
         (hRecips X.1 hX).symm)
 
 /-- The MSC implementing one whole control broadcast. -/
 noncomputable def controlBroadcastMSC
-    (B : L) (recips : L → Prop) (decision : Bool)
+    (B : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ X, recips X → X ≠ B) :
     WordTuple L C F Payload :=
   WordTuple.concatList (controlBroadcastSteps (C := C) (F := F) (Payload := Payload)
-    B recips decision hRecips)
+    B recips decision tag hRecips)
 
-private theorem controlDecisionPayload_compat (decision : Bool) :
+private theorem controlDecisionPayload_compat (decision : Bool) (tag : Payload) :
     PayloadCompatible Payload
-      (controlDecisionPayload (Payload := Payload) decision)
-      (controlDecisionPayload (Payload := Payload) decision) := by
-  by_cases h : decision = true
-  · subst h
-    simpa [controlDecisionPayload, ctrlTruePayload] using
-      (ControlPayloadSpec.compat_ctrl_true (Payload := Payload))
-  · have h' : decision = false := by cases decision <;> simp at h ⊢
-    subst h'
-    simpa [controlDecisionPayload, ctrlFalsePayload] using
-      (ControlPayloadSpec.compat_ctrl_false (Payload := Payload))
+      (controlDecisionPayload (Payload := Payload) decision tag)
+      (controlDecisionPayload (Payload := Payload) decision tag) := by
+  simpa [controlDecisionPayload, taggedControlPayload] using
+    (ControlPayloadSpec.compat_tagged (Payload := Payload) decision tag)
 
-private theorem controlDecisionPayload_isControl (decision : Bool) :
-    isControlPayload (controlDecisionPayload (Payload := Payload) decision) = true := by
-  by_cases h : decision = true
-  · subst h
-    simpa [controlDecisionPayload, ctrlTruePayload] using
-      (ControlPayloadSpec.isControl_true (Payload := Payload))
-  · have h' : decision = false := by
-      cases decision <;> simp at h ⊢
-    subst h'
-    simpa [controlDecisionPayload, ctrlFalsePayload] using
-      (ControlPayloadSpec.isControl_false (Payload := Payload))
+private theorem controlDecisionPayload_isControl (decision : Bool) (tag : Payload) :
+    isControlPayload (controlDecisionPayload (Payload := Payload) decision tag) = true := by
+  simpa [isControlPayload, controlDecisionPayload, taggedControlPayload] using
+    (ControlPayloadSpec.isControl_tagged (Payload := Payload) decision tag)
 
 theorem controlRecipients_nodup (recips : L → Prop) :
     (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips).Nodup := by
@@ -92,17 +79,17 @@ private theorem controlSendTargets_eq_controlRecipients
   simp [hXB.symm]
 
 private theorem controlBroadcast_component
-    (ls : List L) (B X : L) (decision : Bool)
+    (ls : List L) (B X : L) (decision : Bool) (tag : Payload)
     (hNoSelf : ∀ Y ∈ ls, Y ≠ B) (hXB : X ≠ B) (hNodup : ls.Nodup) :
     (WordTuple.concatList
       (ls.attach.map fun Y =>
         mscMsg (C := C) (F := F)
-          B (controlDecisionPayload (Payload := Payload) decision)
-          Y.1 (controlDecisionPayload (Payload := Payload) decision)
+          B (controlDecisionPayload (Payload := Payload) decision tag)
+          Y.1 (controlDecisionPayload (Payload := Payload) decision tag)
           ((hNoSelf Y.1 Y.2).symm))) X =
       if X ∈ ls then
         [AlphabetOf.mkRecv (C := C) (F := F) X
-          (controlDecisionPayload (Payload := Payload) decision) B]
+          (controlDecisionPayload (Payload := Payload) decision tag) B]
       else [] := by
   induction ls generalizing X with
   | nil =>
@@ -119,17 +106,17 @@ private theorem controlBroadcast_component
         have hTail := ih X hNoSelfYs hXB hNodupYs
         simp [hNotMem] at hTail
         simpa [List.attach_cons, WordTuple.concatList_cons, WordTuple.concat,
-          mscMsg_receiver, hXB] using hTail
+          mscMsg_receiver, hXB, Function.comp_def] using hTail
       · have hTail := ih X hNoSelfYs hXB hNodupYs
         simpa [List.attach_cons, WordTuple.concatList_cons, WordTuple.concat,
-          mscMsg_other, hXB, hXY] using hTail
+          mscMsg_other, hXB, hXY, Function.comp_def] using hTail
 
 /-- Every control broadcast MSC is complete. -/
 theorem controlBroadcastMSC_isCompleteMSC
-    (B : L) (recips : L → Prop) (decision : Bool)
+    (B : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ X, recips X → X ≠ B) :
     IsCompleteMSC (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-      B recips decision hRecips) := by
+      B recips decision tag hRecips) := by
   classical
   unfold controlBroadcastMSC controlBroadcastSteps
   apply concatList_complete
@@ -140,10 +127,10 @@ theorem controlBroadcastMSC_isCompleteMSC
     (mem_controlRecipients (C := C) (F := F) (Payload := Payload)).mp X.2
   exact mscMsg_isCompleteMSC
     (C := C) (F := F)
-    B (controlDecisionPayload (Payload := Payload) decision)
-    X.1 (controlDecisionPayload (Payload := Payload) decision)
+    B (controlDecisionPayload (Payload := Payload) decision tag)
+    X.1 (controlDecisionPayload (Payload := Payload) decision tag)
     ((hRecips X.1 hRecipX).symm)
-    (controlDecisionPayload_compat (Payload := Payload) decision)
+    (controlDecisionPayload_compat (Payload := Payload) decision tag)
 
 /-- The concrete decision-prefix tuple for a projected if-construct: the
     decider's choice letter followed by the generated control broadcast. -/
@@ -152,15 +139,17 @@ noncomputable def ifDecisionPrefixMSC
     (decision : Bool) : WordTuple L C F Payload :=
   match decision with
   | true =>
+      let tag := controlTag (.ite c B PTrue PFalse)
       mscIfTrue (C := C) (F := F) (Payload := Payload) c B ∘ₘ
         controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
           B (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-          true (by intro X hX; exact hX.1)
+          true tag (by intro X hX; exact hX.1)
   | false =>
+      let tag := controlTag (.ite c B PTrue PFalse)
       mscIfFalse (C := C) (F := F) (Payload := Payload) c B ∘ₘ
         controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
           B (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-          false (by intro X hX; exact hX.1)
+          false tag (by intro X hX; exact hX.1)
 
 /-- The concrete decision-prefix tuple for a projected while-construct: the
     decider's choice letter followed by the generated control broadcast. -/
@@ -169,15 +158,17 @@ noncomputable def whileDecisionPrefixMSC
     (decision : Bool) : WordTuple L C F Payload :=
   match decision with
   | true =>
+      let tag := controlTag (.whileLoop c B PBody PExit)
       mscWhileTrue (C := C) (F := F) (Payload := Payload) c B ∘ₘ
         controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
           B (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-          true (by intro X hX; exact hX.1)
+          true tag (by intro X hX; exact hX.1)
   | false =>
+      let tag := controlTag (.whileLoop c B PBody PExit)
       mscWhileFalse (C := C) (F := F) (Payload := Payload) c B ∘ₘ
         controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
           B (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-          false (by intro X hX; exact hX.1)
+          false tag (by intro X hX; exact hX.1)
 
 /-- `D` is exactly the decision-prefix tuple generated by projection for the
     if/while construct `P`, decider `B`, and decision value `ν`. -/
@@ -259,22 +250,22 @@ theorem ifDecisionPrefix_isCompleteMSC
       (mscIfFalse (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
         B (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-        false (by intro X hX; exact hX.1))
+        false (controlTag (Prog.ite c B PTrue PFalse)) (by intro X hX; exact hX.1))
       (mscIfFalse_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
         B (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-        false (by intro X hX; exact hX.1))
+        false (controlTag (Prog.ite c B PTrue PFalse)) (by intro X hX; exact hX.1))
   · simp [ifDecisionPrefixMSC]
     exact concat_complete_complete
       (C := C) (F := F) (Payload := Payload)
       (mscIfTrue (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
         B (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-        true (by intro X hX; exact hX.1))
+        true (controlTag (Prog.ite c B PTrue PFalse)) (by intro X hX; exact hX.1))
       (mscIfTrue_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
         B (ifRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PTrue PFalse)
-        true (by intro X hX; exact hX.1))
+        true (controlTag (Prog.ite c B PTrue PFalse)) (by intro X hX; exact hX.1))
 
 theorem whileDecisionPrefix_isCompleteMSC
     (c : C) (B : L) (PBody PExit : Prog L C F Payload)
@@ -288,22 +279,22 @@ theorem whileDecisionPrefix_isCompleteMSC
       (mscWhileFalse (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
         B (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-        false (by intro X hX; exact hX.1))
+        false (controlTag (Prog.whileLoop c B PBody PExit)) (by intro X hX; exact hX.1))
       (mscWhileFalse_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
         B (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-        false (by intro X hX; exact hX.1))
+        false (controlTag (Prog.whileLoop c B PBody PExit)) (by intro X hX; exact hX.1))
   · simp [whileDecisionPrefixMSC]
     exact concat_complete_complete
       (C := C) (F := F) (Payload := Payload)
       (mscWhileTrue (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
         B (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-        true (by intro X hX; exact hX.1))
+        true (controlTag (Prog.whileLoop c B PBody PExit)) (by intro X hX; exact hX.1))
       (mscWhileTrue_isCompleteMSC (C := C) (F := F) (Payload := Payload) c B)
       (controlBroadcastMSC_isCompleteMSC (C := C) (F := F) (Payload := Payload)
         B (whileRecipients (L := L) (C := C) (F := F) (Payload := Payload) B PBody PExit)
-        true (by intro X hX; exact hX.1))
+        true (controlTag (Prog.whileLoop c B PBody PExit)) (by intro X hX; exact hX.1))
 
 theorem isDecisionPrefix_isCompleteMSC
     {P : Prog L C F Payload} {B : L} {decision : Bool}
@@ -361,12 +352,12 @@ theorem strip_decision_prefix
 /-- The decider's local word in the broadcast MSC is exactly the projected
     control-send sequence. -/
 theorem controlBroadcastMSC_decider
-    (B : L) (recips : L → Prop) (decision : Bool)
+    (B : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ X, recips X → X ≠ B) :
     (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-      B recips decision hRecips) B =
+      B recips decision tag hRecips) B =
       controlBroadcastWord (L := L) (C := C) (F := F) (Payload := Payload)
-        B recips decision := by
+        B recips decision tag := by
   classical
   unfold controlBroadcastMSC controlBroadcastSteps controlBroadcastWord
   have hAux :
@@ -377,15 +368,15 @@ theorem controlBroadcastMSC_decider
             let hX : recips X.1 :=
               (mem_controlRecipients (C := C) (F := F) (Payload := Payload)).mp X.2
             mscMsg (C := C) (F := F)
-              B (controlDecisionPayload (Payload := Payload) decision)
-              X.1 (controlDecisionPayload (Payload := Payload) decision)
+              B (controlDecisionPayload (Payload := Payload) decision tag)
+              X.1 (controlDecisionPayload (Payload := Payload) decision tag)
               ((hRecips X.1 hX).symm))
           (List.attach
             (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips))) B =
       (List.attach
         (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips)).map
           (fun X => AlphabetOf.mkSend (C := C) (F := F) B
-            (controlDecisionPayload (Payload := Payload) decision) X.1
+            (controlDecisionPayload (Payload := Payload) decision tag) X.1
             ((hRecips X.1
               ((mem_controlRecipients (C := C) (F := F) (Payload := Payload)).mp X.2)).symm)) := by
     induction (List.attach
@@ -406,7 +397,7 @@ theorem controlBroadcastMSC_decider
   have hTargets :
       sendWordForTargets (L := L) (C := C) (F := F) (Payload := Payload)
         (A := B)
-        (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+        (taggedControlPayload decision tag)
         (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) B recips)
         (by
           intro X hX
@@ -414,14 +405,14 @@ theorem controlBroadcastMSC_decider
             (L := L) (C := C) (F := F) (Payload := Payload) hX) =
       sendWordForTargets (L := L) (C := C) (F := F) (Payload := Payload)
         (A := B)
-        (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+        (taggedControlPayload decision tag)
         (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips)
         hNoSelf := by
     unfold controlSendTargets
     simpa using
       (sendWordForTargets_filter_eq_self
         (L := L) (C := C) (F := F) (Payload := Payload) (A := B)
-        (ControlPayload.setDecision decision ControlPayload.ctrlPattern)
+        (taggedControlPayload decision tag)
         (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips)
         hNoSelf)
   rw [hTargets]
@@ -430,13 +421,13 @@ theorem controlBroadcastMSC_decider
 
 /-- A broadcast recipient sees exactly one control receive from the decider. -/
 theorem controlBroadcastMSC_recipient
-    (B X : L) (recips : L → Prop) (decision : Bool)
+    (B X : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ Y, recips Y → Y ≠ B)
     (hX : recips X) :
     (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-      B recips decision hRecips) X =
+      B recips decision tag hRecips) X =
       [AlphabetOf.mkRecv (C := C) (F := F) X
-        (controlDecisionPayload (Payload := Payload) decision) B] := by
+        (controlDecisionPayload (Payload := Payload) decision tag) B] := by
   classical
   unfold controlBroadcastMSC controlBroadcastSteps
   have hXB : X ≠ B := hRecips X hX
@@ -444,7 +435,7 @@ theorem controlBroadcastMSC_recipient
     controlBroadcast_component
       (C := C) (F := F) (Payload := Payload)
       (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips)
-      B X decision
+      B X decision tag
       (controlRecipients_no_self (C := C) (F := F) (Payload := Payload) hRecips)
       hXB
       (controlRecipients_nodup (C := C) (F := F) (Payload := Payload) recips)
@@ -452,11 +443,11 @@ theorem controlBroadcastMSC_recipient
 /-- Lifelines outside the recipient set see no local event from the control
     broadcast. -/
 theorem controlBroadcastMSC_nonRecipient
-    (B X : L) (recips : L → Prop) (decision : Bool)
+    (B X : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ Y, recips Y → Y ≠ B)
     (hXB : X ≠ B) (hX : ¬ recips X) :
     (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-      B recips decision hRecips) X = [] := by
+      B recips decision tag hRecips) X = [] := by
   classical
   unfold controlBroadcastMSC controlBroadcastSteps
   have hNotMem : X ∉ controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips := by
@@ -466,17 +457,17 @@ theorem controlBroadcastMSC_nonRecipient
     controlBroadcast_component
       (C := C) (F := F) (Payload := Payload)
       (controlRecipients (L := L) (C := C) (F := F) (Payload := Payload) recips)
-      B X decision
+      B X decision tag
       (controlRecipients_no_self (C := C) (F := F) (Payload := Payload) hRecips)
       hXB
       (controlRecipients_nodup (C := C) (F := F) (Payload := Payload) recips)
 
 /-- Erasing a control broadcast yields the empty MSC. -/
 theorem erase_controlBroadcastMSC
-    (B : L) (recips : L → Prop) (decision : Bool)
+    (B : L) (recips : L → Prop) (decision : Bool) (tag : Payload)
     (hRecips : ∀ X, recips X → X ≠ B) :
     erase (controlBroadcastMSC (C := C) (F := F) (Payload := Payload)
-      B recips decision hRecips) = mscEmpty := by
+      B recips decision tag hRecips) = mscEmpty := by
   classical
   unfold controlBroadcastMSC controlBroadcastSteps
   rw [eraseTuple_concatList]
@@ -490,12 +481,12 @@ theorem erase_controlBroadcastMSC
       have hHead :
           erase
               (mscMsg (C := C) (F := F)
-                B (controlDecisionPayload (Payload := Payload) decision) X.1
-                (controlDecisionPayload (Payload := Payload) decision)
+                B (controlDecisionPayload (Payload := Payload) decision tag) X.1
+                (controlDecisionPayload (Payload := Payload) decision tag)
                 ((hRecips X.1 hRecipX).symm)) = mscEmpty := by
         apply eraseTuple_mscMsg_control
-        · exact controlDecisionPayload_isControl (Payload := Payload) decision
-        · exact controlDecisionPayload_isControl (Payload := Payload) decision
+        · exact controlDecisionPayload_isControl (Payload := Payload) decision tag
+        · exact controlDecisionPayload_isControl (Payload := Payload) decision tag
       simp only [List.map_cons, WordTuple.concatList_cons, hHead, ih, mscEmpty,
         WordTuple.concat_eps_left]
 

@@ -224,20 +224,20 @@ end ControlRecipientsLemmas
 /-- Control-send sequence sent by the decider in the fixed lifeline order. -/
 noncomputable def controlBroadcast
     {L C F Payload : Type} [DecidableEq L] [Fintype L] [ControlPayload Payload]
-    (A : L) (recips : L → Prop) (decision : Bool) :
+    (A : L) (recips : L → Prop) (decision : Bool) (tag : Payload) :
     LocProg L C F Payload A := by
   classical
   exact seqLocList <|
     (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) A recips).map
       (fun X => LocProg.send (A := A)
-        (ControlPayload.setDecision decision ControlPayload.ctrlPattern) X)
+        (taggedControlPayload decision tag) X)
 
 @[simp]
 theorem locProgSize_controlBroadcast
     {L C F Payload : Type} [DecidableEq L] [Fintype L] [ControlPayload Payload]
-    (A : L) (recips : L → Prop) (decision : Bool) :
+    (A : L) (recips : L → Prop) (decision : Bool) (tag : Payload) :
     locProgSize (controlBroadcast (L := L) (C := C) (F := F) (Payload := Payload)
-      A recips decision) =
+      A recips decision tag) =
       (controlSendTargets (L := L) (C := C) (F := F) (Payload := Payload) A recips).length := by
   classical
   unfold controlBroadcast
@@ -271,21 +271,25 @@ noncomputable def project
   | .seq P1 P2 =>
       project A P1 ;;ₗ project A P2
   | .ite c B PTrue PFalse =>
+      let Pctrl : Prog L C F Payload := .ite c B PTrue PFalse
+      let tag := controlTag Pctrl
       if hAB : A = B then
         hAB ▸ LocProg.localIf c
-          (controlBroadcast B (ifRecipients B PTrue PFalse) true ;;ₗ project B PTrue)
-          (controlBroadcast B (ifRecipients B PTrue PFalse) false ;;ₗ project B PFalse)
+          (controlBroadcast B (ifRecipients B PTrue PFalse) true tag ;;ₗ project B PTrue)
+          (controlBroadcast B (ifRecipients B PTrue PFalse) false tag ;;ₗ project B PFalse)
       else if hRecip : ifRecipients B PTrue PFalse A then
-        LocProg.recvIf ControlPayload.ctrlPattern B (project A PTrue) (project A PFalse)
+        LocProg.recvIf tag B (project A PTrue) (project A PFalse)
       else
         .eps
   | .whileLoop c B PBody PExit =>
+      let Pctrl : Prog L C F Payload := .whileLoop c B PBody PExit
+      let tag := controlTag Pctrl
       if hAB : A = B then
         hAB ▸ LocProg.localWhile c
-          (controlBroadcast B (whileRecipients B PBody PExit) true ;;ₗ project B PBody)
-          (controlBroadcast B (whileRecipients B PBody PExit) false ;;ₗ project B PExit)
+          (controlBroadcast B (whileRecipients B PBody PExit) true tag ;;ₗ project B PBody)
+          (controlBroadcast B (whileRecipients B PBody PExit) false tag ;;ₗ project B PExit)
       else if hRecip : whileRecipients B PBody PExit A then
-        LocProg.recvWhile ControlPayload.ctrlPattern B (project A PBody) (project A PExit)
+        LocProg.recvWhile tag B (project A PBody) (project A PExit)
       else
         .eps
 
