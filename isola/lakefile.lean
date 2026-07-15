@@ -5,9 +5,9 @@
 --   MSCAgents/
 --     Syntax.lean            — def:phase-syntax
 --     Alphabets.lean         — def:alphabets
---     MSCConcat.lean         — def:msc-concat, rem:concat-msc
+--     MSCConcat.lean         — MSC concatenation, lem:concat-msc
 --     CanonicalMSC.lean      — def:base-msc
---     InductiveSemantics.lean — def:inductive-msc, rem:sem-complete
+--     InductiveSemantics.lean — def:inductive-msc
 
 import Lake
 open Lake DSL

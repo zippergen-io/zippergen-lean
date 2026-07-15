@@ -1,8 +1,7 @@
 /-
   MSCAgents/InductiveSemantics.lean
   =================================
-  Formalization of:
-    • Definition 8  (def:inductive-msc)  — Inductive MSC Semantics ⟦P⟧
+  Formalization of the inductive MSC semantics (`def:inductive-msc`).
 
   Paper: "Provable Coordination for LLM Agents via Message Sequence Charts"
   Section: sec:semantics
@@ -138,11 +137,11 @@ theorem mscSemantics_nonempty
 end SemanticsNonempty
 
 ------------------------------------------------------------------------
--- Remark 2 (rem:sem-complete): Completeness of Inductive Semantics
+-- Completeness observation following `def:inductive-msc`
 ------------------------------------------------------------------------
 
 /-
-  The remark states:
+  The paper states:
     "For every program P and every M ∈ ⟦P⟧, the MSC M is complete."
 
   This is proved by structural induction on P.
@@ -176,10 +175,10 @@ theorem concatList_complete
     · exact ih (fun M hM => hMs M (List.mem_cons_of_mem hd hM))
 
 ------------------------------------------------------------------------
--- Main theorem: rem:sem-complete
+-- Main completeness theorem
 ------------------------------------------------------------------------
 
-/-- **Remark rem:sem-complete** (Completeness of Inductive Semantics):
+/-- Completeness observation following `def:inductive-msc`:
     For every program P and every M ∈ ⟦P⟧, the MSC M is complete.
 
     Proof: by structural induction on P. -/

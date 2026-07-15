@@ -1,7 +1,7 @@
 /-
   MSCAgents/CanonicalMSC.lean
   ===========================
-  Formalization of Definition 7 (def:base-msc) from:
+  Formalization of the canonical-MSC definition (`def:base-msc`) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   This file defines the canonical (atomic) MSCs from which the

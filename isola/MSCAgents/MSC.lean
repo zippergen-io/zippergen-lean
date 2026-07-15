@@ -1,7 +1,7 @@
 /-
   MSCAgents/MSC.lean
   ==================
-  Formalization of Definition 6 (def:msc) from:
+  Formalization of the MSC definition (`def:msc`) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   Paper section: sec:semantics

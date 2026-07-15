@@ -1,20 +1,19 @@
 /-
   MSCAgents/MSCConcat.lean
   ========================
-  Formalization of:
-    • Definition 5  (def:msc-concat)  — MSC Concatenation
-    • Remark 1      (rem:concat-msc)  — Concatenation with a Complete Prefix
+  Support for componentwise MSC concatenation and the closure properties in
+  `lem:concat-msc`.
 
   Paper: "Provable Coordination for LLM Agents via Message Sequence Charts"
   Section: sec:semantics
 
   From the paper:
 
-  Definition (def:msc-concat):
+  Componentwise concatenation (defined in prose before `lem:concat-msc`):
     Let M₁ = (u_A)_A and M₂ = (v_A)_A.
     M₁ ∘ M₂ := (u_A v_A)_{A ∈ 𝓛}
 
-  Remark (rem:concat-msc):
+  Closure properties (`lem:concat-msc`):
     The concatenation of two MSCs is not necessarily an MSC.
     If M₁ is a complete MSC and M₂ is an MSC,
       then M₁ ∘ M₂ is an MSC.
@@ -31,7 +30,7 @@
 import MSCAgents.Alphabets
 
 ------------------------------------------------------------------------
--- MSC Concatenation (def:msc-concat)
+-- MSC concatenation
 ------------------------------------------------------------------------
 
 /-- MSC concatenation: M₁ ∘ M₂ := (u_A ++ v_A)_{A ∈ 𝓛}.
@@ -81,7 +80,7 @@ end ConcatAlgebra
 -- Abstract MSC predicate
 --
 -- We axiomatize the properties of "being an MSC" and "being complete"
--- needed for rem:concat-msc. The concrete instance is in MSC.lean,
+-- needed for `lem:concat-msc`. The concrete instance is in MSC.lean,
 -- where the FIFO relation and acyclicity are constructed.
 ------------------------------------------------------------------------
 
@@ -93,7 +92,8 @@ end ConcatAlgebra
       3. Acyclic causality
     And completeness means every send is matched.
 
-    We axiomatize these as a typeclass so the remark (rem:concat-msc) can
+    We axiomatize these as a typeclass so the closure properties in
+    `lem:concat-msc` can
     be stated and proved in full generality, to be instantiated concretely
     in MSC.lean. -/
 class IsMSCPredicate (L C F Payload : Type) where
@@ -113,7 +113,7 @@ class IsMSCPredicate (L C F Payload : Type) where
       isComplete M1 → isComplete M2 → isComplete (M1 ∘ₘ M2)
 
 ------------------------------------------------------------------------
--- Remark 1 (rem:concat-msc): Concatenation with a Complete Prefix
+-- Concatenation with a complete prefix (`lem:concat-msc`)
 ------------------------------------------------------------------------
 
 section RemConcatMSC
@@ -121,7 +121,7 @@ section RemConcatMSC
 variable {L C F Payload : Type}
 variable [P : IsMSCPredicate L C F Payload]
 
-/-- **Remark rem:concat-msc** (part 1):
+/-- First closure property from `lem:concat-msc`:
     If M₁ is a complete MSC and M₂ is an MSC, then M₁ ∘ M₂ is an MSC.
 
     Paper: "If M₁ is a complete MSC and M₂ is an MSC, then M₁ ∘ M₂ is an MSC." -/
@@ -132,7 +132,7 @@ theorem concat_complete_msc_is_msc
     P.isMSC (M1 ∘ₘ M2) :=
   P.concat_msc M1 M2 h1 h2
 
-/-- **Remark rem:concat-msc** (part 2):
+/-- Second closure property from `lem:concat-msc`:
     If M₁ is a complete MSC and M₂ is also complete, then M₁ ∘ M₂ is complete.
 
     Paper: "If moreover M₂ is complete, then M₁ ∘ M₂ is complete." -/

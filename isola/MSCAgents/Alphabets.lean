@@ -1,7 +1,7 @@
 /-
   MSCAgents/Alphabets.lean
   ========================
-  Formalization of Definition 2 (def:alphabets) from:
+  Formalization of the local-alphabets definition (`def:alphabets`) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   This file defines the local-word alphabets Σ_A for each lifeline A.

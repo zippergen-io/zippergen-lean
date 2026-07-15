@@ -1,7 +1,7 @@
 /-
   MSCAgents/PayloadMatching.lean
   ==============================
-  Formalization of Definition 4 (def:payload-matching) from:
+  Formalization of the payload-matching definition (`def:payload-matching`) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   Paper section: sec:semantics

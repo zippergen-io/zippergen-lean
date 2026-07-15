@@ -1,7 +1,7 @@
 /-
   MSCAgents/FIFORelation.lean
   ===========================
-  Formalization of Definition 3 (def:tuple-fifo) from:
+  Formalization of the tuple-FIFO definition (`def:tuple-fifo`) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   Paper section: sec:semantics

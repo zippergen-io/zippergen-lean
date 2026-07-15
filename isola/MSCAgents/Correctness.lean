@@ -1,9 +1,10 @@
 /- 
   MSCAgents/Correctness.lean
   ==========================
-  Formalization of Theorem (thm:correctness) from sec:projection:
-    • Item 1: realization_complete (L1927) — every M ∈ ⟦P⟧ has a distributed realization
-    • Item 2: realization_sound    (L2386) — every distributed execution erases to ⟦P⟧
+  Formalization of Theorem `thm:correctness` from the Correctness subsection
+  of `sec:implementation`:
+    • `realization_complete`: every M ∈ ⟦P⟧ has a distributed realization
+    • `realization_sound`: every distributed execution erases to ⟦P⟧
 -/
 
 import MSCAgents.BroadcastMSC

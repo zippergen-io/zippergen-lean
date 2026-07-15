@@ -1,7 +1,8 @@
 /-
   MSCAgents/ZipperPost.lean
   =========================
-  Formalization of Definition 13 (def:zip-post) from sec:projection of:
+  Formalization of the zipper-postcondition definition (`def:zip-post`) from
+  the Correctness subsection of `sec:implementation` in:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 
@@ -256,7 +257,7 @@ theorem zipPost_suffix_isMSC
     IsMSC V :=
   suffix_msc_of_complete_prefix Ubar V h.2.1 h.2.2.2
 
-/-- **Remark rem:U-is-MSC**:
+/-- **Lemma `lem:U-is-MSC`**:
     every left tuple carried by a zipper postcondition is itself an MSC. -/
 theorem zipPost_left_isMSC
     {P : Prog L C F Payload}

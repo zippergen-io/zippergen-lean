@@ -1,10 +1,8 @@
 /- 
   MSCAgents/LocalSyntax.lean
   ==========================
-  Formalization of:
-    • Definition 9  — Local Syntax (sec:distributed)
-    • Definition 10 — Distributed Programs (sec:distributed)
-  from:
+  Formalization of the local-syntax and distributed-program definitions from
+  `sec:distributed` in:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

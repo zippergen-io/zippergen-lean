@@ -1,7 +1,8 @@
 /- 
   MSCAgents/ParticipationSets.lean
   ================================
-  Formalization of Definition 12 (def:participation-sets) from sec:projection of:
+  Formalization of the structural-participation definition
+  (`def:participation-sets`) from `sec:projection` of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

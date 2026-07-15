@@ -1,7 +1,7 @@
 /- 
   MSCAgents/Erasure.lean
   ======================
-  Formalization of Definition `def:erase` from sec:projection of:
+  Formalization of the erasure map from `sec:projection` of:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 -/
 

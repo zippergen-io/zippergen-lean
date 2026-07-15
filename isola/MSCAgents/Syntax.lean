@@ -1,7 +1,7 @@
 /-
   MSCAgents/Syntax.lean
   =====================
-  Formalization of Definition 1 (def:phase-syntax) from:
+  Formalization of the abstract-syntax definition (`def:phase-syntax`) from:
   "Provable Coordination for LLM Agents via Message Sequence Charts"
 
   This file defines the abstract syntax of global agent programs (Prog).
